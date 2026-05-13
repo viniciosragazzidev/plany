@@ -9,7 +9,8 @@ export function Logo({ className }: { className?: string }) {
     return (
         <div className={cn('relative  ', className)}>
          <div className="flex   items-center">
-        <HugeiconsIcon className="dark:invert text-primary" size={24} icon={Pencil} />
+                           <Image src="/logo_icon.png" alt="Logo" width={48} height={48} className="rounded-2xl" />
+
           <Image
    className="dark:invert  right-3 relative"        
      src="/logo.png"
