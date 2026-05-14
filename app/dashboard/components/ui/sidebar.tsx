@@ -2,24 +2,104 @@
 
 'use client'
 
-import { Pencil, User, SidebarLeftIcon } from "@hugeicons/core-free-icons";
+import { useState, useEffect } from "react";
+import { User, SidebarLeftIcon, Logout01Icon, Settings02Icon, UserCircleIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import SidebarItems from "./sidebar-items";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Logo } from "@/components/ui/logo";
+import { 
+    DropdownMenu, 
+    DropdownMenuContent, 
+    DropdownMenuItem, 
+    DropdownMenuLabel, 
+    DropdownMenuSeparator, 
+    DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 import Image from "next/image";
+import { authClient } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
 
 export default function SidebarDashboard() {
+    const [mounted, setMounted] = useState(false);
+    const { data: session } = authClient.useSession();
+    const router = useRouter();
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    const handleLogout = async () => {
+        await authClient.signOut({
+            fetchOptions: {
+                onSuccess: () => {
+                    router.push("/login");
+                },
+            },
+        });
+    };
+
+    const UserMenu = ({ isMobile }: { isMobile: boolean }) => (
+        <DropdownMenu>
+            <DropdownMenuTrigger 
+                nativeButton={false}
+                render={
+                    <div className={`flex items-center gap-3 cursor-pointer group w-full ${isMobile ? "px-0" : "justify-center"}`}>
+                        <div className="w-10 h-10 bg-primary/10 border border-primary/20 flex justify-center items-center text-primary rounded-2xl group-hover:bg-primary/20 transition-colors shrink-0">
+                            {session?.user?.image ? (
+                                <Image src={session.user.image} alt={session.user.name} width={40} height={40} className="rounded-2xl" />
+                            ) : (
+                                <HugeiconsIcon className="shrink-0" size={20} icon={User} />
+                            )}
+                        </div>
+                        {isMobile && (
+                            <div className="flex flex-col text-left overflow-hidden">
+                                <span className="text-sm font-semibold truncate">{session?.user?.name || "User Name"}</span>
+                                <span className="text-xs text-muted-foreground truncate">{session?.user?.email || "user@example.com"}</span>
+                            </div>
+                        )}
+                    </div>
+                } 
+            />
+            <DropdownMenuContent side={isMobile ? "bottom" : "right"} align={isMobile ? "start" : "end"} className="w-56">
+                <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                <div className="px-2 py-1.5 flex flex-col gap-0.5 md:hidden">
+                    <span className="text-sm font-medium">{session?.user?.name}</span>
+                    <span className="text-xs text-muted-foreground">{session?.user?.email}</span>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="gap-2">
+                    <HugeiconsIcon icon={UserCircleIcon} size={16} />
+                    Perfil
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-2">
+                    <HugeiconsIcon icon={Settings02Icon} size={16} />
+                    Configurações
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive">
+                    <HugeiconsIcon icon={Logout01Icon} size={16} />
+                    Sair
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+
     const renderSidebarContent = (isMobile: boolean) => (
         <div className={`sticky top-0 left-0 w-full h-screen flex py-6 flex-col justify-between items-center ${isMobile ? "px-2" : ""}`}>          
             <div className="flex flex-col gap-10 w-full items-center">
                 <div className={`flex items-center gap-3 ${isMobile ? "px-4 w-full justify-start" : "justify-center"}`}>
-                   
-                    {isMobile ?  <Logo /> :   
-                         <Image src="/logo_icon.png" alt="Logo" width={48} height={48} className="rounded-2xl" />
- }
+                    {isMobile ? <Logo /> : (
+                        <img 
+                            src="/logo_icon.png" 
+                            alt="Logo" 
+                            width={48} 
+                            height={48} 
+                            className="rounded-2xl" 
+                        />
+                    )}
                 </div>
 
                 <div className="w-full">
@@ -31,17 +111,7 @@ export default function SidebarDashboard() {
                 {isMobile && <Separator className="bg-border/50 w-[90%]" />}
 
                 <div className={`flex items-center gap-4 w-full ${isMobile ? "px-4 justify-between" : "justify-center"}`}>
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary/10 border border-primary/20 flex justify-center items-center text-primary cursor-pointer rounded-2xl hover:bg-primary/20 transition-colors">
-                            <HugeiconsIcon className="shrink-0" size={20} icon={User} />
-                        </div>
-                        {isMobile && (
-                            <div className="flex flex-col">
-                                <span className="text-sm font-semibold">User Name</span>
-                                <span className="text-xs text-muted-foreground">user@example.com</span>
-                            </div>
-                        )}
-                    </div>
+                    <UserMenu isMobile={isMobile} />
 
                     {isMobile && (
                         <SheetClose render={
@@ -54,6 +124,12 @@ export default function SidebarDashboard() {
             </div>
         </div>
     );
+
+    if (!mounted) {
+        return (
+            <div className="sticky top-0 left-0 w-18 h-screen overflow-hidden shrink-0 bg-secondary/10 border-r border-border/50 hidden md:block" />
+        );
+    }
 
     return (
       <>

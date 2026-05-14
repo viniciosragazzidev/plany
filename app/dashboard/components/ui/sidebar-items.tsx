@@ -16,22 +16,22 @@ export default function SidebarItems({ closeOnSelect = false }: { closeOnSelect?
             href: "/dashboard"
         },
         {
-            name: "Projects",
+            name: "Bancadas",
             icon: Folder,
-            href: "/dashboard/projects"
+            href: "/dashboard/bancadas"
         },
         {
-            name: "Tasks",
+            name: "Tarefas",
             icon: CheckCircle,
             href: "/dashboard/tasks"
         },
         {
-            name: "Calendar",
+            name: "Anotações",
             icon: Calendar,
             href: "/dashboard/calendar"
         },
         {
-            name: "Settings",
+            name: "Configurações",
             icon: Settings,
             href: "/dashboard/settings"
         },
