@@ -29,7 +29,10 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { completeOnboarding, createStudyBench } from "@/lib/actions/onboarding";
+import { extractBenchDataFromEdital } from "@/lib/actions/bench";
 import { Logo } from "@/components/ui/logo";
+import { parseISO, isValid, parse } from "date-fns";
+import { FileAttachmentIcon, Loading03Icon, SparklesIcon } from "@hugeicons/core-free-icons";
 
 type Step = 1 | 2 | 3;
 
@@ -42,6 +45,8 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
   const router = useRouter();
   const [step, setStep] = useState<Step>(mode === "onboarding" ? 1 : 2);
   const [isPending, setIsPending] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -49,10 +54,73 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
     studentLevel: "" as any,
     mainPainPoint: "",
     goalName: "",
+    examBoard: "",
     targetDate: undefined as Date | undefined,
     weeklyHours: "20",
     subjects: [] as { title: string; priority: number; colorTag: string }[],
+    examNotice: "",
   });
+
+  const handleMagicImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || file.type !== "application/pdf") {
+      toast.error("Por favor, selecione um arquivo PDF.");
+      return;
+    }
+
+    setIsExtracting(true);
+    const formDataUpload = new FormData();
+    formDataUpload.append("file", file);
+
+    try {
+      const result = await extractBenchDataFromEdital(formDataUpload);
+      if (result.success && result.data) {
+        const { goalName, targetDate, examBoard, weeklyHours, subjects, examNotice } = result.data;
+        
+        let parsedDate = undefined;
+        if (targetDate) {
+          // Tenta vários formatos
+          const formats = ["yyyy-MM-dd", "dd/MM/yyyy", "dd-MM-yyyy"];
+          for (const fmt of formats) {
+            const date = parse(targetDate, fmt, new Date());
+            if (isValid(date)) {
+              parsedDate = date;
+              break;
+            }
+          }
+          
+          if (!parsedDate) {
+            const date = parseISO(targetDate);
+            if (isValid(date)) parsedDate = date;
+          }
+        }
+
+        setFormData(prev => ({
+          ...prev,
+          goalName: goalName || prev.goalName,
+          examBoard: examBoard || prev.examBoard,
+          targetDate: parsedDate || prev.targetDate,
+          weeklyHours: weeklyHours?.toString() || prev.weeklyHours,
+          subjects: [
+            ...prev.subjects,
+            ...(subjects || []).map((s: string) => ({ title: s, priority: 3, colorTag: "#3b82f6" }))
+          ],
+          examNotice: examNotice || ""
+        }));
+
+        toast.success("Dados extraídos com sucesso!", {
+          description: "Revisamos o edital e preenchemos os campos para você."
+        });
+      } else {
+        throw new Error(result.error || "Falha na extração");
+      }
+    } catch (error: any) {
+      toast.error("Erro ao processar edital: " + error.message);
+    } finally {
+      setIsExtracting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   // Subjects Input State
   const [newSubject, setNewSubject] = useState({ title: "", priority: 3, colorTag: "#3b82f6" });
@@ -199,16 +267,75 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
 
           {step === 2 && (
             <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-500">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="goal">Qual seu grande objetivo?</Label>
-                <div className="relative">
-                  <HugeiconsIcon icon={Trophy} className="absolute left-3 top-3 size-4 text-muted-foreground" />
+              {/* Magic Import Section */}
+              <div className="bg-primary/5 border border-primary/10 rounded-2xl p-6 flex flex-col gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
+                    <HugeiconsIcon icon={SparklesIcon} size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold">Importação Mágica</h4>
+                    <p className="text-xs text-muted-foreground">Preencha tudo automaticamente via PDF</p>
+                  </div>
+                </div>
+
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept="application/pdf"
+                  onChange={handleMagicImport}
+                />
+                
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  className="w-full bg-background hover:bg-primary/5 border-primary/20 gap-2 h-12 rounded-xl"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isExtracting}
+                >
+                  {isExtracting ? (
+                    <>
+                      <HugeiconsIcon icon={Loading03Icon} className="animate-spin size-4" />
+                      Analisando Edital...
+                    </>
+                  ) : (
+                    <>
+                      <HugeiconsIcon icon={FileAttachmentIcon} className="size-4 text-primary" />
+                      Selecionar Edital PDF
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <Separator className="flex-1" />
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Ou preencha manualmente</span>
+                <Separator className="flex-1" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="goal">Qual seu grande objetivo?</Label>
+                  <div className="relative">
+                    <HugeiconsIcon icon={Trophy} className="absolute left-3 top-3 size-4 text-muted-foreground" />
+                    <Input
+                      id="goal"
+                      placeholder="Ex: Magistratura 2026, ENEM..."
+                      className="pl-10"
+                      value={formData.goalName}
+                      onChange={(e) => setFormData({ ...formData, goalName: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="board">Banca Examinadora</Label>
                   <Input
-                    id="goal"
-                    placeholder="Ex: Magistratura 2026, ENEM, OAB..."
-                    className="pl-10"
-                    value={formData.goalName}
-                    onChange={(e) => setFormData({ ...formData, goalName: e.target.value })}
+                    id="board"
+                    placeholder="Ex: FGV, Cebraspe..."
+                    value={formData.examBoard}
+                    onChange={(e) => setFormData({ ...formData, examBoard: e.target.value })}
                   />
                 </div>
               </div>

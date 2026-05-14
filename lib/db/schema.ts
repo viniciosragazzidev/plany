@@ -59,7 +59,7 @@ export const studentLevelEnum = pgEnum("student_level", [
   "profissional",
 ]);
 
-export const materialTypeEnum = pgEnum("material_type", ["pdf", "link", "text"]);
+export const materialTypeEnum = pgEnum("material_type", ["pdf", "link", "text", "anotacao", "simulado", "flashcard"]);
 
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -81,7 +81,24 @@ export const studyBenches = pgTable("study_benches", {
   goalName: text("goal_name").notNull(),
   targetDate: date("target_date").notNull(),
   weeklyHours: integer("weekly_hours").notNull(),
+  examNotice: text("exam_notice"), // Markdown content
+  examNoticeRaw: text("exam_notice_raw"), // Raw PDF text
+  examNoticeUrl: text("exam_notice_url"), // URL for the PDF
+  examBoard: text("exam_board"), // Banca examinadora
   isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const editalItems = pgTable("edital_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  benchId: uuid("bench_id")
+    .notNull()
+    .references(() => studyBenches.id),
+  category: text("category").notNull(), // e.g., "Direito Administrativo"
+  topic: text("topic").notNull(), // e.g., "Atos Administrativos"
+  description: text("description"),
+  isCovered: boolean("is_covered").default(false).notNull(),
+  weight: integer("weight").default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -93,16 +110,22 @@ export const subjects = pgTable("subjects", {
   title: text("title").notNull(),
   priority: integer("priority").notNull(), // 1-5
   colorTag: text("color_tag").notNull(), // hex code
+  icon: text("icon"), // hugeicons icon name or lucide icon name
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const materials = pgTable("materials", {
   id: uuid("id").primaryKey().defaultRandom(),
-  subjectId: uuid("subject_id")
+  benchId: uuid("bench_id")
     .notNull()
-    .references(() => subjects.id),
+    .references(() => studyBenches.id),
+  subjectId: uuid("subject_id")
+    .references(() => subjects.id), // Optional, can belong to a bench but not a specific subject
   title: text("title").notNull(),
   type: materialTypeEnum("type").notNull(),
   storageUrl: text("storage_url"),
-  vectorId: text("vector_id"),
+  content: text("content"), // Markdown or plain text
+  isPinned: boolean("is_pinned").default(false).notNull(),
+  contentVectorRef: text("content_vector_ref"), // Placeholder for future vector DB integration
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });

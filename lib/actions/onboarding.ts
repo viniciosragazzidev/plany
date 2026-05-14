@@ -16,6 +16,8 @@ export async function completeOnboarding(data: {
   targetDate: string;
   weeklyHours: number;
   subjects: { title: string; priority: number; colorTag: string }[];
+  examBoard?: string;
+  examNotice?: string;
 }) {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -48,6 +50,8 @@ export async function completeOnboarding(data: {
           goalName: data.goalName,
           targetDate: data.targetDate,
           weeklyHours: data.weeklyHours,
+          examBoard: data.examBoard,
+          examNotice: data.examNotice,
         })
         .returning();
 
@@ -79,6 +83,8 @@ export async function createStudyBench(data: {
   targetDate: string;
   weeklyHours: number;
   subjects: { title: string; priority: number; colorTag: string }[];
+  examBoard?: string;
+  examNotice?: string;
 }) {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -107,6 +113,8 @@ export async function createStudyBench(data: {
           goalName: data.goalName,
           targetDate: data.targetDate,
           weeklyHours: data.weeklyHours,
+          examBoard: data.examBoard,
+          examNotice: data.examNotice,
         })
         .returning();
 

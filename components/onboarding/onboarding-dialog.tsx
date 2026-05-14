@@ -25,7 +25,7 @@ export function OnboardingDialog({ forceOpen = false }: OnboardingDialogProps) {
         }}
     >
       <DialogContent 
-        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
         showCloseButton={!forceOpen}
         onPointerDownOutside={(e) => {
             if (forceOpen) e.preventDefault(); // Prevent closing on outside click

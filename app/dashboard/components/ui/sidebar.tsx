@@ -3,7 +3,7 @@
 'use client'
 
 import { useState, useEffect } from "react";
-import { User, SidebarLeftIcon, Logout01Icon, Settings02Icon, UserCircleIcon } from "@hugeicons/core-free-icons";
+import { User, SidebarLeftIcon, Logout01Icon, Settings02Icon, UserCircleIcon, Sun01Icon, Moon01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import SidebarItems from "./sidebar-items";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
@@ -21,13 +21,17 @@ import {
 import Image from "next/image";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
+import { Switch } from "@/components/ui/switch";
 
 export default function SidebarDashboard() {
     const [mounted, setMounted] = useState(false);
     const { data: session } = authClient.useSession();
     const router = useRouter();
+    const { theme, setTheme } = useTheme();
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setMounted(true);
     }, []);
 
@@ -78,6 +82,17 @@ export default function SidebarDashboard() {
                     <HugeiconsIcon icon={Settings02Icon} size={16} />
                     Configurações
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <div className="flex items-center justify-between px-2 py-1.5 focus:bg-accent focus:text-accent-foreground outline-none transition-colors">
+                    <div className="flex items-center gap-2">
+                        <HugeiconsIcon icon={theme === 'dark' ? Moon01Icon : Sun01Icon} size={16} />
+                        <span className="text-sm">Tema Escuro</span>
+                    </div>
+                    <Switch 
+                        checked={theme === 'dark'} 
+                        onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')} 
+                    />
+                </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive">
                     <HugeiconsIcon icon={Logout01Icon} size={16} />
