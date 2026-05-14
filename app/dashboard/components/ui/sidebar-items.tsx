@@ -44,11 +44,11 @@ export default function SidebarItems({ closeOnSelect = false }: { closeOnSelect?
                     {items.map((item) => {
                         const isActive = pathname === item.href;
                         const content = (
-                            <li className={`flex items-center gap-3 p-2 cursor-pointer group rounded-xl transition-all ${isActive ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" : "bg-transparent text-foreground/80 hover:bg-secondary/80 hover:text-foreground"}`}>
+                            <li className={`flex items-center gap-3 p-2 cursor-pointer group rounded-xl transition-all ${isActive ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" : "bg-transparent text-foreground/80 hover:bg-primary/80 hover:text-foreground"}`}>
                                 <HugeiconsIcon className={`${isActive ? "" : "group-hover:scale-110"} transition-all shrink-0`} size={20} icon={item.icon} />
                                 {closeOnSelect && <span className="font-medium text-sm">{item.name}</span>}
                             </li>
-                        );
+                        )
 
                         const trigger = closeOnSelect ? (
                             <SheetClose render={<Link href={item.href}>{content}</Link>} />

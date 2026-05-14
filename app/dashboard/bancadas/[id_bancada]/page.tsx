@@ -5,13 +5,14 @@ import { eq, and } from "drizzle-orm";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowLeft01Icon, Book01Icon, Settings02Icon, Notification01Icon, Search01Icon } from "@hugeicons/core-free-icons";
+import { ArrowLeft01Icon, Book01Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { SourceColumn } from "./components/source-column";
 import { ChatBench } from "./components/chat-bench";
 import { IntelligenceTools } from "./components/intelligence-tools";
 import { DeleteBenchButton } from "./components/delete-bench-button";
+import { NotificationCenter } from "../../components/ui/notification-center";
 
 import { BenchProvider } from "./components/bench-context";
 
@@ -20,7 +21,6 @@ export default async function BenchDetailPage({
 }: {
   params: Promise<{ id_bancada: string }>;
 }) {
-  // ... rest of setup code ...
   const { id_bancada } = await params;
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -55,6 +55,7 @@ export default async function BenchDetailPage({
       title: materials.title,
       type: materials.type,
       subjectId: materials.subjectId,
+      editalItemId: materials.editalItemId,
       isPinned: materials.isPinned,
       subjectTitle: subjects.title,
     })
@@ -71,7 +72,11 @@ export default async function BenchDetailPage({
   });
 
   return (
-    <BenchProvider initialSubjects={benchSubjects.map(s => s.id)}>
+    <BenchProvider 
+      initialSubjects={benchSubjects.map(s => s.id)} 
+      benchId={bench.id} 
+      initialResearchStatus={bench.researchStatus}
+    >
       <div className="flex flex-col h-screen bg-background overflow-hidden font-sans">
         {/* Top Header */}
         <header className="h-16 border-b border-border/50 px-6 flex items-center justify-between bg-background/80 backdrop-blur-md z-20 shrink-0">
@@ -96,10 +101,7 @@ export default async function BenchDetailPage({
             <Button variant="ghost" size="icon-sm" className="rounded-xl h-9 w-9">
               <HugeiconsIcon icon={Search01Icon} size={18} className="text-muted-foreground" />
             </Button>
-            <Button variant="ghost" size="icon-sm" className="rounded-xl h-9 w-9 relative">
-              <HugeiconsIcon icon={Notification01Icon} size={18} className="text-muted-foreground" />
-              <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-primary rounded-full ring-2 ring-background" />
-            </Button>
+            <NotificationCenter />
             <div className="h-4 w-px bg-border/50 mx-2" />
             <DeleteBenchButton benchId={bench.id} />
           </div>
@@ -111,7 +113,6 @@ export default async function BenchDetailPage({
           <SourceColumn 
             benchId={bench.id} 
             materials={benchMaterials as any} 
-            examNotice={bench.examNotice} 
             editalItems={items as any}
             subjects={benchSubjects as any}
           />
@@ -120,7 +121,12 @@ export default async function BenchDetailPage({
           <ChatBench />
 
           {/* Right Column: Intelligence Tools */}
-          <IntelligenceTools targetDate={bench.targetDate} weeklyHours={bench.weeklyHours} />
+          <IntelligenceTools 
+            targetDate={bench.targetDate} 
+            weeklyHours={bench.weeklyHours}
+            benchId={bench.id}
+            editalItems={items as any}
+          />
         </div>
       </div>
     </BenchProvider>

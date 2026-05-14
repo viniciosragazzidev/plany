@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
-import { studyBenches, subjects, materials, profiles } from "@/lib/db/schema";
+import { studyBenches, subjects, materials, profiles, editalItems } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { differenceInDays } from "date-fns";
 
@@ -33,11 +33,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Bancada não encontrada" }, { status: 404 });
     }
 
-    // Buscar Perfil do Usuário para mais contexto
-    const profile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, bench.profileId),
-    });
-
     // Determine which subjects to show as context
     const benchSubjects = await db.query.subjects.findMany({
       where: selectedSubjectIds && selectedSubjectIds.length > 0
@@ -45,37 +40,75 @@ export async function POST(req: NextRequest) {
         : eq(subjects.benchId, benchId),
     });
 
-    // Determine which materials to fetch based on user selection
+    const subjectIds = benchSubjects.map(s => s.id);
+
+    // Fetch edital items for these subjects
+    const benchEditalItems = await db.query.editalItems.findMany({
+      where: eq(editalItems.benchId, benchId),
+    });
+
+    // Filter edital items that match the selected subjects
+    const filteredEditalItems = benchEditalItems.filter(item => 
+      benchSubjects.some(s => 
+        item.category.toLowerCase().includes(s.title.toLowerCase()) || 
+        s.title.toLowerCase().includes(item.category.toLowerCase())
+      )
+    );
+
+    // Fetch materials for these subjects
     const benchMaterials = await db
       .select({
+        id: materials.id,
         title: materials.title,
         type: materials.type,
         content: materials.content,
-        subjectTitle: subjects.title,
+        subjectId: materials.subjectId,
+        editalItemId: materials.editalItemId,
       })
       .from(materials)
-      .innerJoin(subjects, eq(materials.subjectId, subjects.id))
       .where(
         selectedSubjectIds && selectedSubjectIds.length > 0
-          ? and(eq(subjects.benchId, benchId), inArray(materials.subjectId, selectedSubjectIds))
-          : eq(subjects.benchId, benchId)
+          ? and(eq(materials.benchId, benchId), inArray(materials.subjectId, selectedSubjectIds))
+          : eq(materials.benchId, benchId)
       );
 
-    // 2. Preparar Contexto Detalhado (REFORÇADO)
+    // 2. Preparar Contexto Detalhado (ESTRUTURADO)
     const today = new Date();
-    const targetDate = new Date(bench.targetDate);
-    const daysLeft = differenceInDays(targetDate, today);
     
-    const subjectsList = benchSubjects.map(s => `- ${s.title} (Prioridade: ${s.priority}/5)`).join("\n");
+    // Build a structured tree for the AI
+    const contextTree = benchSubjects.map(subject => {
+      const subjectTopics = filteredEditalItems.filter(item => 
+        item.category.toLowerCase().includes(subject.title.toLowerCase()) || 
+        subject.title.toLowerCase().includes(item.category.toLowerCase())
+      );
+
+      const subjectMaterials = benchMaterials.filter(m => m.subjectId === subject.id);
+
+      return {
+        subject: subject.title,
+        priority: subject.priority,
+        topics: subjectTopics.map(t => ({
+          name: t.topic,
+          description: t.description,
+          isCovered: t.isCovered,
+          materials: subjectMaterials.filter(m => m.editalItemId === t.id).map(m => m.title)
+        })),
+        generalMaterials: subjectMaterials.filter(m => !m.editalItemId).map(m => m.title)
+      };
+    });
+
     const materialContents = benchMaterials
       .filter(m => m.content)
-      .map(m => `--- MATERIAL: ${m.title} (${m.subjectTitle}) ---\n${m.content}\n--- FIM DO MATERIAL ---`)
+      .map(m => {
+        const subject = benchSubjects.find(s => s.id === m.subjectId);
+        return `--- MATERIAL: ${m.title} (${subject?.title || "Geral"}) ---\n${m.content}\n--- FIM DO MATERIAL ---`;
+      })
       .join("\n\n");
 
 const contextStatus = selectedSubjectIds && selectedSubjectIds.length > 0
-    ? `FOCO ATIVO: O usuário selecionou especificamente as seguintes disciplinas: ${benchSubjects.map(s => s.title).join(", ")}. 
-       IGNORE qualquer conteúdo fora deste escopo selecionado.`
-    : "CONTEXTO AMPLO: O usuário está visualizando todas as disciplinas disponíveis.";
+    ? `FOCO ATIVO: O usuário selecionou especificamente as seguintes matérias: ${benchSubjects.map(s => s.title).join(", ")}. 
+       Dê prioridade total a esses assuntos e seus respectivos materiais.`
+    : "CONTEXTO AMPLO: O usuário está visualizando todas as matérias da bancada.";
 
 const systemPrompt = `Você é o PLANY, o parceiro de estudos definitivo e tutor de IA da plataforma.
 Sua missão é guiar o usuário rumo à aprovação com foco total nos materiais que ele mesmo subiu.
@@ -84,33 +117,27 @@ HOJE É: ${today.toLocaleDateString('pt-BR')}
 
 ---
 
-### 🟢 STATUS DO CONTEXTO ATUAL:
+### 🏛️ BANCADA ATUAL (OBJETIVO):
+- **PROVA/CONCURSO:** ${bench.goalName}
+- **BANCA:** ${bench.examBoard || "Não informada"}
+- **DATA DA PROVA:** ${bench.targetDate}
+
+### 🟢 STATUS DO CONTEXTO (O QUE O USUÁRIO ESTÁ VENDO AGORA):
 ${contextStatus}
 
-### 📚 FONTE ÚNICA DE VERDADE:
-- **DISCIPLINAS NO RADAR:** ${subjectsList || "Nenhuma disciplina cadastrada."}
-- **BIBLIOTECA DE CONTEÚDOS (MARKDOWN):** ${materialContents || "Sem materiais para as disciplinas focadas."}
-- **REGRAS DO JOGO (EDITAL):** ${bench.examNotice || "Edital ainda não importado."}
+### 📚 ESTRUTURA DE ESTUDOS (SUA FONTE DE VERDADE):
+${JSON.stringify(contextTree, null, 2)}
+
+### 📄 CONTEÚDO DOS MATERIAIS (BASE PARA RESPOSTAS):
+${materialContents || "Sem conteúdos específicos carregados para o contexto atual."}
 
 ---
 
-### 🕹️ PERSONALIDADE E ESTILO (VIBE PLANY):
-1. **Papo Reto e Despojado:** Fale de forma simples, como um colega de estudos que manja muito do assunto. Use humor leve para quebrar o peso dos estudos.
-2. **Tradutor de "Grego":** Encontrou um termo difícil (juridiquês, tecnicismos, acadêmicos)? Explique na hora com uma analogia simples. Ex: "Vetorização é como a IA criando um mapa de biblioteca pra achar o livro certo em segundos".
-3. **Mestre do Markdown:** Use títulos, negritos, tabelas e listas. Transforme paredes de texto em algo que o usuário consiga "escanear" com os olhos[cite: 1].
-4. **Respeito aos Tokens:** Seja direto[cite: 1]. Se puder explicar em 3 tópicos, não use 10. Economize o fôlego (e os créditos da API)[cite: 1].
-
-### ⚖️ DIRETRIZES RÍGIDAS DE ATUAÇÃO:
-1. **O Material é o Chefe:** Se a resposta está no material fornecido, você ESTÁ PROIBIDO de usar conhecimento externo[cite: 1]. 
-2. **Sinceridade Acima de Tudo:** Se o assunto não está nos materiais selecionados, diga: "Olha, esse tópico não está nos materiais dessas matérias que você selecionou agora. Quer que eu use meu conhecimento geral ou você prefere subir um material novo sobre isso?"[cite: 1]
-3. **Citação de Origem:** Sempre indique de onde veio a info (ex: "Conforme o material [Título]..."). Sem fonte, sem ponto[cite: 1].
-4. **Identidade Própria:** Você é o Plany. Você não é um modelo do Google, nem da OpenAI[cite: 1]. Você é o cérebro da plataforma.
-5. **Saúde Mental e Sprints:** Se a conversa estiver longa, sugira um 'Sprint de Descanso'. Ex: "Você já mandou ver em 5 tópicos! Que tal 5 min de café pra resetar o cérebro?"[cite: 1]
-
-### 🛠️ EXEMPLOS DE ANALOGIAS PARA USAR:
-- **Edital:** "É o arquivo de configuração (.env) da sua aprovação: se ignorar uma linha, o sistema não roda."
-- **Revisão:** "É como dar um 'git commit' no conhecimento: se não fizer, você perde o que produziu."
-- **Flashcards:** "São os testes unitários do seu cérebro."
+### 🕹️ PERSONALIDADE E DIRETRIZES:
+1. **Diferencie Matéria de Assunto:** Uma "Matéria" (ex: Português) contém vários "Assuntos" (ex: Concordância). Quando o usuário perguntar quais assuntos ele tem selecionado, liste os Assuntos (topics) dentro das Matérias (subjects) que estão no Foco Ativo.
+2. **O Material é o Chefe:** Use prioritariamente o conteúdo dos materiais. Se não houver material sobre um assunto, avise e ofereça usar seu conhecimento geral.
+3. **Markdown de Elite:** Use tabelas para comparativos, listas para passos e negrito para termos chave.
+4. **Citação Obrigatória:** Sempre cite o nome do material ao usar sua informação.
 
 Idioma: Português do Brasil.`;
 

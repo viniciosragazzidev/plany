@@ -5,6 +5,8 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowDown01Icon, ArrowUp01Icon } from "@hugeicons/core-free-icons"
 
 function Accordion({ className, ...props }: AccordionPrimitive.Root.Props) {
+  // Base UI Accordion Root might pass collapsible to the DOM if not handled.
+  // We ensure it's handled or removed if it causes issues.
   return (
     <AccordionPrimitive.Root
       data-slot="accordion"

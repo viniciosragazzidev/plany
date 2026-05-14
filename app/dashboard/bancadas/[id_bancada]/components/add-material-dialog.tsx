@@ -36,14 +36,23 @@ interface AddMaterialDialogProps {
   onSuccess: () => void;
   trigger?: React.ReactElement;
   initialSubjectId?: string;
+  initialEditalItemId?: string;
 }
 
-export function AddMaterialDialog({ benchId, subjects, onSuccess, trigger, initialSubjectId }: AddMaterialDialogProps) {
+export function AddMaterialDialog({ 
+  benchId, 
+  subjects, 
+  onSuccess, 
+  trigger, 
+  initialSubjectId,
+  initialEditalItemId 
+}: AddMaterialDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [type, setType] = useState<"pdf" | "link" | "text" | "anotacao" | "simulado" | "flashcard">("pdf");
   const [title, setTitle] = useState("");
   const [subjectId, setSubjectId] = useState(initialSubjectId || "");
+  const [editalItemId, setEditalItemId] = useState(initialEditalItemId || "");
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isPinned, setIsPinned] = useState(false);
@@ -84,6 +93,7 @@ export function AddMaterialDialog({ benchId, subjects, onSuccess, trigger, initi
     const formData = new FormData();
     formData.append("benchId", benchId);
     if (subjectId) formData.append("subjectId", subjectId);
+    if (editalItemId) formData.append("editalItemId", editalItemId);
     formData.append("title", title);
     formData.append("type", type);
     formData.append("isPinned", isPinned.toString());
@@ -93,7 +103,13 @@ export function AddMaterialDialog({ benchId, subjects, onSuccess, trigger, initi
     try {
       const result = await addMaterial(formData);
       if (result.success) {
-        toast.success("Adicionado com sucesso!");
+        toast.success("Lido e memorizado! 🧠", {
+          description: `Identifiquei o material "${title}". Vamos começar os estudos?`,
+          action: {
+            label: "Começar",
+            onClick: () => console.log("Abrir chat ou material")
+          }
+        });
         onSuccess();
         setIsOpen(false);
         resetForm();
@@ -112,6 +128,7 @@ export function AddMaterialDialog({ benchId, subjects, onSuccess, trigger, initi
     setFile(null);
     setTitle("");
     setSubjectId(initialSubjectId || "");
+    setEditalItemId(initialEditalItemId || "");
     setUrl("");
     setType("pdf");
     setIsPinned(false);

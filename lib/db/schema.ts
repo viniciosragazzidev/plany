@@ -61,6 +61,8 @@ export const studentLevelEnum = pgEnum("student_level", [
 
 export const materialTypeEnum = pgEnum("material_type", ["pdf", "link", "text", "anotacao", "simulado", "flashcard"]);
 
+export const webSourceStatusEnum = pgEnum("web_source_status", ["pending", "converted", "imported", "rejected"]);
+
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: text("user_id")
@@ -86,6 +88,7 @@ export const studyBenches = pgTable("study_benches", {
   examNoticeUrl: text("exam_notice_url"), // URL for the PDF
   examBoard: text("exam_board"), // Banca examinadora
   isActive: boolean("is_active").default(true).notNull(),
+  researchStatus: text("research_status").default("idle").notNull(), // idle, researching, completed, failed
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -121,11 +124,43 @@ export const materials = pgTable("materials", {
     .references(() => studyBenches.id),
   subjectId: uuid("subject_id")
     .references(() => subjects.id), // Optional, can belong to a bench but not a specific subject
+  editalItemId: uuid("edital_item_id")
+    .references(() => editalItems.id), // Vínculo opcional com o Assunto (Visão Estruturada)
   title: text("title").notNull(),
   type: materialTypeEnum("type").notNull(),
   storageUrl: text("storage_url"),
   content: text("content"), // Markdown or plain text
   isPinned: boolean("is_pinned").default(false).notNull(),
   contentVectorRef: text("content_vector_ref"), // Placeholder for future vector DB integration
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const webSources = pgTable("web_sources", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  benchId: uuid("bench_id")
+    .notNull()
+    .references(() => studyBenches.id),
+  title: text("title").notNull(),
+  sourceUrl: text("source_url").notNull(),
+  htmlContent: text("html_content"), // Raw HTML for traceability
+  markdownContent: text("markdown_content"), // Clean markdown
+  category: text("category").notNull(), // Subject/Matéria
+  topic: text("topic").notNull(), // Specific topic
+  authorityScore: integer("authority_score").default(50).notNull(), // 1-100
+  status: webSourceStatusEnum("status").default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type").default("info").notNull(), // info, success, warning, error
+  isRead: boolean("is_read").default(false).notNull(),
+  link: text("link"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

@@ -1,16 +1,16 @@
 'use client'
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Notification, Plus, Search } from "@hugeicons/core-free-icons";
+import { Plus, Search } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
-import { differenceInDays, parseISO } from "date-fns";
 
 import { CreateBenchDialog } from "@/components/onboarding/create-bench-dialog";
+import { NotificationCenter } from "./components/ui/notification-center";
 
 export default function Dashboard() {
   const searchParams = useSearchParams();
@@ -48,10 +48,7 @@ export default function Dashboard() {
             <Button variant="outline" size="icon-sm" className="rounded-xl">
                <HugeiconsIcon icon={Search} size={18} />
             </Button>
-            <Button variant="outline" size="icon-sm" className="rounded-xl relative">
-               <HugeiconsIcon icon={Notification} size={18} />
-               <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
-            </Button>
+            <NotificationCenter />
             
             <CreateBenchDialog 
                 trigger={
