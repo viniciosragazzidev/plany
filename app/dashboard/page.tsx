@@ -8,13 +8,29 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 
 import { CreateBenchDialog } from "@/components/onboarding/create-bench-dialog";
 import { NotificationCenter } from "./components/ui/notification-center";
+import { StatsCards } from "./components/stats-cards";
+import { ProgressCharts } from "./components/progress-charts";
+import { InsightsSection } from "./components/insights-section";
+import { DashboardEmptyState } from "./components/empty-state";
+import { getDashboardData } from "@/lib/actions/dashboard";
 
 export default function Dashboard() {
   const searchParams = useSearchParams();
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending: isSessionPending } = authClient.useSession();
+
+  const { data: dashboardResponse, isLoading: isDashboardLoading } = useQuery({
+    queryKey: ["dashboard-data"],
+    queryFn: async () => {
+      const result = await getDashboardData();
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    enabled: !!session?.user?.id,
+  });
 
   const userName = session?.user?.name?.split(" ")[0] || "Usuário";
 
@@ -26,12 +42,15 @@ export default function Dashboard() {
     }
   }, [searchParams]);
 
+  const isLoading = isSessionPending || isDashboardLoading;
+  const isEmpty = dashboardResponse?.isEmpty && !isLoading;
+
   return (
     <div className="flex flex-col flex-1 font-sans min-h-screen bg-background">
-      <main className="p-8 space-y-8">
+      <main className="p-8 space-y-8 max-w-7xl mx-auto w-full">
         <div className="top-bar flex justify-between items-center">
           <div className="space-y-1">
-            {isPending ? (
+            {isSessionPending ? (
               <div className="space-y-2">
                 <Skeleton className="h-8 w-48" />
                 <Skeleton className="h-4 w-64" />
@@ -39,20 +58,20 @@ export default function Dashboard() {
             ) : (
               <>
                 <h2 className="text-2xl font-bold tracking-tight text-foreground">Olá, {userName}!👌</h2>
-                <p className="text-muted-foreground">Aqui é onde você pode gerenciar seu conteúdo.</p>
+                <p className="text-muted-foreground">Aqui está o resumo do seu progresso acadêmico.</p>
               </>
             )}
           </div>
           
           <div className="flex gap-3 items-center">
-            <Button variant="outline" size="icon-sm" className="rounded-xl">
+            <Button variant="outline" size="icon" className="rounded-xl size-10">
                <HugeiconsIcon icon={Search} size={18} />
             </Button>
             <NotificationCenter />
             
             <CreateBenchDialog 
                 trigger={
-                    <Button className="rounded-xl gap-2">
+                    <Button className="rounded-xl gap-2 hidden md:flex">
                         Nova Bancada
                         <HugeiconsIcon icon={Plus} size={18} />
                     </Button>
@@ -61,39 +80,29 @@ export default function Dashboard() {
           </div>
         </div>
         
-        <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex flex-col gap-4 p-5 rounded-3xl border border-border/50 bg-secondary/10">
-                  <div className="flex items-center gap-3">
-                    <Skeleton className="w-10 h-10 rounded-2xl" />
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-3 w-16" />
-                    </div>
-                  </div>
-                  <Skeleton className="aspect-video w-full rounded-2xl" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-[80%]" />
-                  </div>
-                  <div className="flex justify-between items-center pt-2">
-                    <Skeleton className="h-8 w-20 rounded-xl" />
-                    <Skeleton className="h-8 w-8 rounded-full" />
-                  </div>
-                </div>
-              ))}
-            </div>
+        {isEmpty ? (
+          <DashboardEmptyState />
+        ) : (
+          <div className="space-y-8 animate-in fade-in duration-700">
+            {/* 1. Quick Stats */}
+            <StatsCards stats={dashboardResponse?.stats} isLoading={isLoading} />
 
-            <div className="space-y-4">
-              <Skeleton className="h-6 w-48 rounded-lg" />
-              <div className="grid gap-4 md:grid-cols-4">
-                {[1, 2, 4, 5].map((i) => (
-                  <Skeleton key={i} className="h-32 rounded-3xl" />
-                ))}
-              </div>
-            </div>
+            {/* 2. Visualização de Progresso (Gráficos) */}
+            <ProgressCharts 
+              radarData={dashboardResponse?.radarData} 
+              activityData={dashboardResponse?.activityData}
+              isLoading={isLoading} 
+            />
+
+            {/* 3. Insights e Feedbacks */}
+            <InsightsSection 
+              pendingSubjects={dashboardResponse?.pendingSubjects}
+              userName={userName}
+              overallProgress={dashboardResponse?.stats?.overallProgress || 0}
+              isLoading={isLoading}
+            />
           </div>
+        )}
       </main>
     </div>
   );

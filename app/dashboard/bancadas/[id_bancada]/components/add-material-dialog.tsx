@@ -4,7 +4,6 @@ import { useState, useRef } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { 
   PlusSignIcon,
-  Loading03Icon,
   Cancel01Icon,
   Tick01Icon,
   Link01Icon,
@@ -28,7 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { addMaterial } from "@/lib/actions/bench";
+import { useBenchData } from "@/hooks/use-bench-data";
 
 interface AddMaterialDialogProps {
   benchId: string;
@@ -48,7 +47,6 @@ export function AddMaterialDialog({
   initialEditalItemId 
 }: AddMaterialDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isPending, setIsPending] = useState(false);
   const [type, setType] = useState<"pdf" | "link" | "text" | "anotacao" | "simulado" | "flashcard">("pdf");
   const [title, setTitle] = useState("");
   const [subjectId, setSubjectId] = useState(initialSubjectId || "");
@@ -57,6 +55,8 @@ export function AddMaterialDialog({
   const [file, setFile] = useState<File | null>(null);
   const [isPinned, setIsPinned] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { addMaterial: addMaterialOptimistic } = useBenchData(benchId);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -89,7 +89,6 @@ export function AddMaterialDialog({
       return;
     }
 
-    setIsPending(true);
     const formData = new FormData();
     formData.append("benchId", benchId);
     if (subjectId) formData.append("subjectId", subjectId);
@@ -100,27 +99,17 @@ export function AddMaterialDialog({
     if (file) formData.append("file", file);
     if (url) formData.append("url", url);
 
+    // Close immediately for instant feel
+    setIsOpen(false);
+    
     try {
-      const result = await addMaterial(formData);
-      if (result.success) {
-        toast.success("Lido e memorizado! 🧠", {
-          description: `Identifiquei o material "${title}". Vamos começar os estudos?`,
-          action: {
-            label: "Começar",
-            onClick: () => console.log("Abrir chat ou material")
-          }
-        });
-        onSuccess();
-        setIsOpen(false);
-        resetForm();
-      } else {
-        throw new Error(result.error || "Erro ao adicionar");
-      }
+      addMaterialOptimistic(formData);
+      toast.success("Iniciando upload... 🧠", {
+        description: `O material "${title}" será processado em segundo plano.`,
+      });
+      resetForm();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Erro desconhecido";
-      toast.error("Erro: " + message);
-    } finally {
-      setIsPending(false);
+      toast.error("Erro ao iniciar upload.");
     }
   };
 
@@ -265,26 +254,16 @@ export function AddMaterialDialog({
             variant="outline" 
             className="flex-1" 
             onClick={() => setIsOpen(false)}
-            disabled={isPending}
           >
             Cancelar
           </Button>
           <Button 
             className="flex-1 gap-2" 
-            disabled={isPending || (type === "pdf" && !file) || (type === "link" && !url)}
+            disabled={(type === "pdf" && !file) || (type === "link" && !url)}
             onClick={handleUpload}
           >
-            {isPending ? (
-              <>
-                <HugeiconsIcon icon={Loading03Icon} size={18} className="animate-spin" />
-                Salvando...
-              </>
-            ) : (
-              <>
-                <HugeiconsIcon icon={Tick01Icon} size={18} />
-                Confirmar
-              </>
-            )}
+            <HugeiconsIcon icon={Tick01Icon} size={18} />
+            Confirmar
           </Button>
         </div>
       </DialogContent>

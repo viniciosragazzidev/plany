@@ -4,6 +4,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Providers } from "./providers";
 
 const figtree = Figtree({subsets:['latin'],variable:'--font-sans'});
 
@@ -41,7 +42,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <Providers>
+            {children}
+          </Providers>
           <Toaster />
         </ThemeProvider>
       </body>

@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createSubject } from "@/lib/actions/bench";
 import { toast } from "sonner";
+import { useBenchData } from "@/hooks/use-bench-data";
 
 interface SubjectManagerProps {
   benchId: string;
@@ -27,9 +28,10 @@ const PRESET_COLORS = [
 
 export function SubjectManager({ benchId }: SubjectManagerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isPending, setIsPending] = useState(false);
   const [title, setTitle] = useState("");
   const [colorTag, setColorTag] = useState(PRESET_COLORS[0]);
+
+  const { addSubject } = useBenchData(benchId);
 
   const handleCreate = async () => {
     if (!title) {
@@ -37,27 +39,10 @@ export function SubjectManager({ benchId }: SubjectManagerProps) {
       return;
     }
 
-    setIsPending(true);
-    try {
-      const result = await createSubject({
-        benchId,
-        title,
-        colorTag,
-      });
-
-      if (result.success) {
-        toast.success(`Disciplina "${title}" criada!`);
-        setIsOpen(false);
-        setTitle("");
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Erro desconhecido";
-      toast.error("Erro ao criar disciplina: " + message);
-    } finally {
-      setIsPending(false);
-    }
+    addSubject({ title, colorTag });
+    toast.success(`Disciplina "${title}" sendo criada...`);
+    setIsOpen(false);
+    setTitle("");
   };
 
   return (
@@ -109,26 +94,16 @@ export function SubjectManager({ benchId }: SubjectManagerProps) {
             variant="outline" 
             className="flex-1" 
             onClick={() => setIsOpen(false)}
-            disabled={isPending}
           >
             Cancelar
           </Button>
           <Button 
             className="flex-1 gap-2" 
-            disabled={isPending || !title}
+            disabled={!title}
             onClick={handleCreate}
           >
-            {isPending ? (
-              <>
-                <HugeiconsIcon icon={Loading03Icon} size={18} className="animate-spin" />
-                Criando...
-              </>
-            ) : (
-              <>
-                <HugeiconsIcon icon={Tick01Icon} size={18} />
-                Confirmar
-              </>
-            )}
+            <HugeiconsIcon icon={Tick01Icon} size={18} />
+            Confirmar
           </Button>
         </div>
       </DialogContent>

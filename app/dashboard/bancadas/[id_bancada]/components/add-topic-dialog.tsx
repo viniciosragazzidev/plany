@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { createTopic } from "@/lib/actions/bench";
+import { useBenchData } from "@/hooks/use-bench-data";
 
 interface AddTopicDialogProps {
   benchId: string;
@@ -32,8 +33,9 @@ interface AddTopicDialogProps {
 
 export function AddTopicDialog({ benchId, category, onSuccess, trigger }: AddTopicDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isPending, setIsPending] = useState(false);
   const [topic, setTopic] = useState("");
+
+  const { addTopic } = useBenchData(benchId);
 
   const handleCreate = async () => {
     if (!topic) {
@@ -41,27 +43,11 @@ export function AddTopicDialog({ benchId, category, onSuccess, trigger }: AddTop
       return;
     }
 
-    setIsPending(true);
-    try {
-      const result = await createTopic({
-        benchId,
-        category,
-        topic,
-      });
-
-      if (result.success) {
-        toast.success("Assunto adicionado!");
-        setIsOpen(false);
-        setTopic("");
-        onSuccess?.();
-      } else {
-        toast.error("Erro: " + result.error);
-      }
-    } catch (error) {
-      toast.error("Erro ao criar assunto.");
-    } finally {
-      setIsPending(false);
-    }
+    addTopic({ category, topic });
+    toast.success("Adicionando assunto...");
+    setIsOpen(false);
+    setTopic("");
+    onSuccess?.();
   };
 
   const defaultTrigger = (
@@ -101,12 +87,8 @@ export function AddTopicDialog({ benchId, category, onSuccess, trigger }: AddTop
           <Button variant="outline" className="flex-1" onClick={() => setIsOpen(false)}>
             Cancelar
           </Button>
-          <Button className="flex-1 gap-2" onClick={handleCreate} disabled={isPending || !topic}>
-            {isPending ? (
-              <HugeiconsIcon icon={Loading03Icon} className="animate-spin" size={18} />
-            ) : (
-              <HugeiconsIcon icon={Tick01Icon} size={18} />
-            )}
+          <Button className="flex-1 gap-2" onClick={handleCreate} disabled={!topic}>
+            <HugeiconsIcon icon={Tick01Icon} size={18} />
             Salvar
           </Button>
         </div>

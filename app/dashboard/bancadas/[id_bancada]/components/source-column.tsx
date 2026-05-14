@@ -14,11 +14,11 @@ import {
   Tag01Icon,
   Folder02Icon,
   Layers01Icon,
-  FilterIcon
+  FilterIcon,
+  Loading03Icon
 } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { deleteSubject, deleteMaterial, togglePinMaterial, toggleTopicCompletion } from "@/lib/actions/bench";
 import { AddMaterialDialog } from "./add-material-dialog";
 import { SubjectManager } from "./subject-manager";
 import { AddTopicDialog } from "./add-topic-dialog";
@@ -43,61 +43,50 @@ import { cn } from "@/lib/utils";
 import { CoverageRing } from "@/components/ui/coverage-ring";
 import { Tick01Icon } from "@hugeicons/core-free-icons";
 
-interface Material {
-  id: string;
-  title: string;
-  type: 'pdf' | 'link' | 'text' | 'anotacao' | 'simulado' | 'flashcard';
-  subjectTitle: string;
-  subjectId: string | null;
-  editalItemId?: string | null;
-  isPinned: boolean;
-  createdAt?: string | Date;
-}
-interface EditalItem {
-  id: string;
-  category: string;
-  topic: string;
-  isCovered: boolean;
-}
+import { useBenchData } from "@/hooks/use-bench-data";
 
 interface SourceColumnProps {
   benchId: string;
-  materials: Material[];
-  editalItems?: EditalItem[];
-  subjects?: { id: string; title: string; colorTag: string; icon?: string | null }[];
 }
 
-export function SourceColumn({ benchId, materials, editalItems = [], subjects = [] }: SourceColumnProps) {
+export function SourceColumn({ benchId }: SourceColumnProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const { selectedContextSubjects, toggleContextSubject, selectAll, deselectAll } = useBench();
   const [subjectToDelete, setSubjectToDelete] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
+  const { 
+    subjects, 
+    editalItems, 
+    materials, 
+    isLoading, 
+    toggleTopic, 
+    deleteSubject,
+    deleteMaterial,
+    togglePin
+  } = useBenchData(benchId);
+
   React.useEffect(() => {
     setMounted(true);
   }, []);
 
-  const filteredSubjects = subjects.filter(s => 
+  const filteredSubjects = (subjects as any[]).filter(s => 
     s.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getMaterialsBySubject = (subjectId: string | null) => {
-    return materials.filter(m => m.subjectId === subjectId);
+    return (materials as any[]).filter(m => m.subjectId === subjectId);
   };
 
   const getMaterialsByTopic = (topicId: string) => {
-    return materials.filter(m => m.editalItemId === topicId);
+    return (materials as any[]).filter(m => m.editalItemId === topicId);
   };
 
   const handleDeleteSubject = async () => {
     if (!subjectToDelete) return;
-    const result = await deleteSubject(subjectToDelete);
-    if (result.success) {
-      toast.success("Disciplina excluída.");
-      setSubjectToDelete(null);
-    } else {
-      toast.error("Erro ao excluir disciplina.");
-    }
+    deleteSubject(subjectToDelete);
+    toast.success("Disciplina excluída com sucesso!");
+    setSubjectToDelete(null);
   };
 
   const uncategorizedMaterials = getMaterialsBySubject(null);
@@ -174,7 +163,14 @@ export function SourceColumn({ benchId, materials, editalItems = [], subjects = 
                   </Badge>
                 </div>
                 <div className="ml-8 border-l border-border/40 pl-2 space-y-1 pt-1 pb-2">
-                   {uncategorizedMaterials.map(m => <MaterialItem key={m.id} material={m} />)}
+                   {uncategorizedMaterials.map(m => (
+                     <MaterialItem 
+                      key={m.id} 
+                      material={m} 
+                      onDelete={() => deleteMaterial(m.id)}
+                      onTogglePin={() => togglePin({ materialId: m.id, isPinned: !m.isPinned })}
+                    />
+                   ))}
                 </div>
               </div>
             )}
@@ -253,7 +249,14 @@ export function SourceColumn({ benchId, materials, editalItems = [], subjects = 
                                     </div>
                                 </AccordionTrigger>
                                 <AccordionContent className="pt-1 pb-2 pl-2 space-y-0.5 border-none">
-                                    {globalMaterials.map(m => <MaterialItem key={m.id} material={m} />)}
+                                    {globalMaterials.map(m => (
+                                      <MaterialItem 
+                                        key={m.id} 
+                                        material={m} 
+                                        onDelete={() => deleteMaterial(m.id)}
+                                        onTogglePin={() => togglePin({ materialId: m.id, isPinned: !m.isPinned })}
+                                      />
+                                    ))}
                                     <AddMaterialDialog 
                                         benchId={benchId} 
                                         subjects={subjects} 
@@ -291,7 +294,8 @@ export function SourceColumn({ benchId, materials, editalItems = [], subjects = 
                                                       item={item} 
                                                       subjectTitle={subject.title} 
                                                       totalSubjectTopics={subjectEditalItems.length} 
-                                                      coveredSubjectTopics={coveredTopics} 
+                                                      coveredSubjectTopics={coveredTopics}
+                                                      onToggle={(isCovered) => toggleTopic({ itemId: item.id, isCovered })}
                                                     />
                                                   </div>
                                                   
@@ -312,7 +316,14 @@ export function SourceColumn({ benchId, materials, editalItems = [], subjects = 
                                                   </AccordionTrigger>
                                                 </div>
                                                 <AccordionContent className="pt-1 pb-2 pl-4 space-y-0.5 border-none">
-                                                    {topicMaterials.map(m => <MaterialItem key={m.id} material={m} />)}
+                                                    {topicMaterials.map(m => (
+                                                      <MaterialItem 
+                                                        key={m.id} 
+                                                        material={m} 
+                                                        onDelete={() => deleteMaterial(m.id)}
+                                                        onTogglePin={() => togglePin({ materialId: m.id, isPinned: !m.isPinned })}
+                                                      />
+                                                    ))}
                                                     <AddMaterialDialog 
                                                         benchId={benchId} 
                                                         subjects={subjects} 
@@ -353,55 +364,66 @@ export function SourceColumn({ benchId, materials, editalItems = [], subjects = 
   );
 }
 
-function MaterialItem({ material }: { material: Material }) {
+function MaterialItem({ material, onDelete, onTogglePin }: { 
+  material: any; 
+  onDelete: () => void;
+  onTogglePin: () => void;
+}) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const isNew = material.createdAt && (new Date().getTime() - new Date(material.createdAt).getTime() < 1000 * 60 * 5);
+  const isOptimistic = (material as any).isOptimistic;
 
-  const handleDelete = async () => {
-    await deleteMaterial(material.id);
-    toast.success("Material removido com sucesso!");
+  const handleDelete = () => {
+    onDelete();
+    toast.success("Material removido!");
     setIsDeleteDialogOpen(false);
   };
 
-  const handleTogglePin = async () => {
-    await togglePinMaterial(material.id, !material.isPinned);
-    toast.success(material.isPinned ? "Material removido do topo" : "Material fixado no topo para acesso rápido!");
+  const handleTogglePin = () => {
+    onTogglePin();
+    toast.success(material.isPinned ? "Material removido do topo" : "Material fixado no topo!");
   };
 
   return (
     <div className={cn(
       "group flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-background transition-all cursor-pointer relative",
-      isNew && "animate-pulse border border-primary/20 bg-primary/5"
+      (isNew || isOptimistic) && "border border-primary/20 bg-primary/5"
     )}>
       <div className={cn(
         "size-1.5 rounded-full shrink-0 transition-colors",
-        isNew ? "bg-primary animate-ping" : "bg-border/50"
+        isOptimistic ? "bg-primary animate-pulse" : isNew ? "bg-primary animate-ping" : "bg-border/50"
       )} />
-      <span className="text-xs font-medium truncate flex-1 group-hover:text-primary transition-colors">
+      <span className={cn(
+        "text-xs font-medium truncate flex-1 group-hover:text-primary transition-colors",
+        isOptimistic && "text-muted-foreground italic"
+      )}>
         {material.title}
+        {isOptimistic && " (Sincronizando...)"}
       </span>
       {material.isPinned && <HugeiconsIcon icon={PinIcon} size={10} className="text-primary" />}
       
-      <DropdownMenu>
-        <DropdownMenuTrigger render={
-          <Button variant="ghost" size="icon-xs" className="opacity-0 group-hover:opacity-100 h-5 w-5 rounded-md transition-opacity">
-            <HugeiconsIcon icon={MoreHorizontalIcon} size={12} />
-          </Button>
-        } />
-        <DropdownMenuContent align="end" className="w-40">
-          <DropdownMenuItem className="gap-2" onClick={handleTogglePin}>
-            <HugeiconsIcon icon={material.isPinned ? PinOffIcon : PinIcon} size={14} />
-            {material.isPinned ? "Desafixar" : "Fixar no topo"}
-          </DropdownMenuItem>
-          <DropdownMenuItem 
-            className="gap-2 text-destructive" 
-            onClick={() => setIsDeleteDialogOpen(true)}
-          >
-            <HugeiconsIcon icon={Delete02Icon} size={14} />
-            Excluir
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {!isOptimistic && (
+        <DropdownMenu>
+          <DropdownMenuTrigger render={
+            <Button variant="ghost" size="icon-xs" className="opacity-0 group-hover:opacity-100 h-5 w-5 rounded-md transition-opacity">
+              <HugeiconsIcon icon={MoreHorizontalIcon} size={12} />
+            </Button>
+          } />
+          <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuItem className="gap-2" onClick={handleTogglePin}>
+              <HugeiconsIcon icon={material.isPinned ? PinOffIcon : PinIcon} size={14} />
+              {material.isPinned ? "Desafixar" : "Fixar no topo"}
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              className="gap-2 text-destructive" 
+              onClick={() => setIsDeleteDialogOpen(true)}
+            >
+              <HugeiconsIcon icon={Delete02Icon} size={14} />
+              Excluir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
 
       <ConfirmDialog
         open={isDeleteDialogOpen}
@@ -415,66 +437,53 @@ function MaterialItem({ material }: { material: Material }) {
   );
 }
 
-function TopicToggle({ item, subjectTitle, totalSubjectTopics, coveredSubjectTopics }: { 
-  item: EditalItem; 
+function TopicToggle({ 
+  item, 
+  subjectTitle, 
+  totalSubjectTopics, 
+  coveredSubjectTopics,
+  onToggle
+}: { 
+  item: any; 
   subjectTitle: string;
   totalSubjectTopics: number;
   coveredSubjectTopics: number;
+  onToggle: (isCovered: boolean) => void;
 }) {
-  const [isCovered, setIsCovered] = useState(item.isCovered);
-  const [isPending, setIsPending] = useState(false);
-
-  // Sync with prop if it changes from outside
-  React.useEffect(() => {
-    setIsCovered(item.isCovered);
-  }, [item.isCovered]);
-
-  const handleToggle = async (e: React.MouseEvent) => {
+  const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isPending) return;
+    const newStatus = !item.isCovered;
+    
+    onToggle(newStatus);
 
-    const newStatus = !isCovered;
-    setIsCovered(newStatus); // Optimistic update
-    setIsPending(true);
+    if (newStatus) {
+      toast.success("Tópico Concluído! 🎉", {
+        description: `Você venceu o assunto "${item.topic}". Continue assim!`,
+        icon: "🔥",
+      });
 
-    try {
-      const result = await toggleTopicCompletion(item.id, newStatus);
-      if (result.success && newStatus) {
-        toast.success("Tópico Concluído! 🎉", {
-          description: `Você venceu o assunto "${item.topic}". Continue assim!`,
-          icon: "🔥",
-        });
-
-        // Use the current covered count + 1 (optimistic)
-        if (totalSubjectTopics > 0 && (coveredSubjectTopics + 1) === totalSubjectTopics) {
-          setTimeout(() => {
-            toast.success("MATÉRIA VENCIDA! 🏆", {
-              description: `Parabéns! Você concluiu todos os tópicos de "${subjectTitle}".`,
-              className: "bg-primary text-primary-foreground border-none",
-            });
-          }, 800);
-        }
+      if (totalSubjectTopics > 0 && (coveredSubjectTopics + 1) === totalSubjectTopics) {
+        setTimeout(() => {
+          toast.success("MATÉRIA VENCIDA! 🏆", {
+            description: `Parabéns! Você concluiu todos os tópicos de "${subjectTitle}".`,
+            className: "bg-primary text-primary-foreground border-none",
+          });
+        }, 800);
       }
-    } catch (error) {
-      setIsCovered(!newStatus); // Rollback
-      toast.error("Erro ao atualizar status.");
-    } finally {
-      setIsPending(false);
     }
   };
 
   return (
     <button 
       onClick={handleToggle}
-      disabled={isPending}
       className={cn(
         "size-5 rounded-md border flex items-center justify-center transition-all shrink-0",
-        isCovered 
+        item.isCovered 
           ? "bg-emerald-500 border-emerald-500 text-white opacity-100 shadow-[0_0_8px_rgba(16,185,129,0.3)]" 
           : "border-border hover:border-primary/50 text-transparent opacity-40 hover:opacity-100"
       )}
     >
-      <HugeiconsIcon icon={Tick01Icon} size={10} strokeWidth={3} className={cn(isPending && "animate-pulse")} />
+      <HugeiconsIcon icon={Tick01Icon} size={10} strokeWidth={3} />
     </button>
   );
 }
