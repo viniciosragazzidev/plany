@@ -22,12 +22,17 @@ function generateMaterialsHash(ids: string[]): string {
   return createHash("sha256").update(ids.sort().join(",")).digest("hex");
 }
 
-export async function getSummariesAction(benchId: string, subjectId: string) {
+export async function getSummariesAction(benchId: string, subjectId?: string) {
   try {
+    const conditions = [eq(summaries.benchId, benchId)];
+    if (subjectId) {
+      conditions.push(eq(summaries.subjectId, subjectId));
+    }
+
     const list = await db
       .select()
       .from(summaries)
-      .where(and(eq(summaries.benchId, benchId), eq(summaries.subjectId, subjectId)))
+      .where(and(...conditions))
       .orderBy(desc(summaries.createdAt));
 
     return { success: true, summaries: list };
