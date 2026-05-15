@@ -11,4 +11,10 @@ export const auth = betterAuth({
     emailAndPassword: {
         enabled: true,
     },
+    secret: process.env.BETTER_AUTH_SECRET,
+    baseURL: process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL,
+    debug: true,
+    advanced: {
+        trustHost: true,
+    },
 });
