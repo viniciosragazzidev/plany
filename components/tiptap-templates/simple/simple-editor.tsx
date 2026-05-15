@@ -193,7 +193,14 @@ export function SimpleEditor({ initialContent, onChange }: SimpleEditorProps) {
   const [mobileView, setMobileView] = useState<"main" | "highlighter" | "link">(
     "main"
   )
+  const [toolbarHeight, setToolbarHeight] = useState(0)
   const toolbarRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (toolbarRef.current) {
+      setToolbarHeight(toolbarRef.current.getBoundingClientRect().height)
+    }
+  }, [mobileView])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -232,12 +239,9 @@ export function SimpleEditor({ initialContent, onChange }: SimpleEditorProps) {
         onError: (error) => console.error("Upload failed:", error),
       }),
       Markdown.configure({
-        tightLists: true,
-        bulletListMarker: '-',
-        breaks: true,
         transformPastedText: true,
         transformCopiedText: true,
-      }),
+      } as any),
     ],
     content: initialContent || "",
     contentType: "markdown",
@@ -255,7 +259,7 @@ export function SimpleEditor({ initialContent, onChange }: SimpleEditorProps) {
 
   const rect = useCursorVisibility({
     editor,
-    overlayHeight: toolbarRef.current?.getBoundingClientRect().height ?? 0,
+    overlayHeight: toolbarHeight,
   })
 
   useEffect(() => {

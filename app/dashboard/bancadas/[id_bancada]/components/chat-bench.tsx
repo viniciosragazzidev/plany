@@ -52,13 +52,6 @@ export function ChatBench() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
-  useEffect(() => {
-    if (externalMessage) {
-      handleSend(externalMessage);
-      setExternalMessage(null);
-    }
-  }, [externalMessage]);
-
   const LOADING_MESSAGES = isEditalConsultantMode ? [
     "Analisando regras do edital...",
     "Buscando critérios de pontuação...",
@@ -89,7 +82,7 @@ export function ChatBench() {
     scrollToBottom();
   }, [messages, isLoading]);
 
-  const handleSend = async (overrideMessage?: string) => {
+  const handleSend = useCallback(async (overrideMessage?: string) => {
     const messageContent = overrideMessage || input;
     if (!messageContent.trim() || isLoading) return;
 
@@ -139,7 +132,14 @@ export function ChatBench() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [input, isLoading, messages, benchId, selectedContextSubjects, isEditalConsultantMode]);
+
+  useEffect(() => {
+    if (externalMessage) {
+      handleSend(externalMessage);
+      setExternalMessage(null);
+    }
+  }, [externalMessage, handleSend, setExternalMessage]);
 
   return (
     <div className="flex flex-col h-full flex-1 bg-background relative overflow-hidden font-sans">

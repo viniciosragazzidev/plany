@@ -4,16 +4,12 @@ import { db } from "@/lib/db";
 import { 
   summaries, 
   materials, 
-  subjects, 
-  materialChunks,
-  materialTypeEnum
+  subjects
 } from "@/lib/db/schema";
-import { eq, and, desc, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { GoogleGenAI } from "@google/genai";
-import { getEmbedding } from "@/lib/ai-optimizations";
 import { createHash } from "crypto";
-import { updateAnotacaoContent } from "./cadernos";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const ai = new GoogleGenAI({ apiKey: apiKey || "" });

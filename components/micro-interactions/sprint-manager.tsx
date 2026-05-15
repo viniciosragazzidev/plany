@@ -10,8 +10,8 @@ interface SprintManagerProps {
 }
 
 export function SprintManager({ intervalMinutes = 25 }: SprintManagerProps) {
-  const [startTime] = useState(Date.now());
-  const [lastNotificationTime, setLastNotificationTime] = useState(Date.now());
+  const [startTime] = useState(() => Date.now());
+  const [lastNotificationTime, setLastNotificationTime] = useState(() => Date.now());
 
   useEffect(() => {
     const interval = setInterval(() => {
