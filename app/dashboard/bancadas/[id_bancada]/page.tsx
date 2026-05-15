@@ -112,9 +112,6 @@ export default async function BenchDetailPage({
           {/* Left Column: Sources */}
           <SourceColumn 
             benchId={bench.id} 
-            materials={benchMaterials as any} 
-            editalItems={items as any}
-            subjects={benchSubjects as any}
           />
 
           {/* Center Column: AI Chat */}

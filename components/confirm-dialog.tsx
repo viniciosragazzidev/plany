@@ -11,10 +11,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { ReactNode } from "react"
+import { ReactNode, ReactElement } from "react"
 
 interface ConfirmDialogProps {
-  trigger?: ReactNode
+  trigger?: ReactElement
   title: string
   description: string
   onConfirm: () => void

@@ -208,7 +208,7 @@ export function WebResearchDialog({
                         </Button>
                     </div>
 
-                    <Accordion type="single" collapsible className="w-full">
+                    <Accordion className="w-full">
                         {Object.entries(groupedByTopic).map(([topic, items]) => (
                         <AccordionItem key={topic} value={topic}>
                             <AccordionTrigger className="hover:no-underline">

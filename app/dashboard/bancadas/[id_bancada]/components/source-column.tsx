@@ -237,7 +237,7 @@ export function SourceColumn({ benchId }: SourceColumnProps) {
 
                     <div className="ml-8 border-l border-border/40 pl-2 space-y-1 pt-1 pb-2">
                         {/* 1. Global Materials */}
-                        <Accordion type="single" collapsible className="w-full">
+                        <Accordion className="w-full border-none">
                             <AccordionItem value="global" className="border-none">
                                 <AccordionTrigger className="py-1.5 px-2 hover:no-underline hover:bg-secondary/10 rounded-lg transition-all text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-transparent border-none">
                                     <div className="flex items-center gap-2">
@@ -286,7 +286,7 @@ export function SourceColumn({ benchId }: SourceColumnProps) {
                                 subjectEditalItems.map(item => {
                                     const topicMaterials = getMaterialsByTopic(item.id);
                                     return (
-                                        <Accordion key={item.id} type="single" collapsible className="w-full">
+                                        <Accordion key={item.id} className="w-full border-none">
                                             <AccordionItem value={item.id} className="border-none">
                                                 <div className="flex items-center group/topic transition-all hover:bg-secondary/5 rounded-lg">
                                                   <div className="pl-2">

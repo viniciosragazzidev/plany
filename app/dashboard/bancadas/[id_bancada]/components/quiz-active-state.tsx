@@ -83,7 +83,7 @@ export function QuizActiveState({ quizId, onBack }: QuizActiveStateProps) {
   const handleFinish = async () => {
     const res = await finishQuizAction(quizId);
     if (res.success) {
-      setScore(res.score);
+      setScore(res.score ?? 0);
       setIsFinished(true);
     } else {
       toast.error("Erro ao finalizar simulado");

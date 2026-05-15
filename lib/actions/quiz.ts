@@ -94,7 +94,9 @@ export async function generateQuizAction(
       }
     });
 
-    const quizData = JSON.parse(response.text);
+    const responseText = response.text;
+    if (!responseText) throw new Error("Resposta da IA vazia");
+    const quizData = JSON.parse(responseText);
 
     // 3. Database Operations: FIFO & Save
     const result = await db.transaction(async (tx) => {

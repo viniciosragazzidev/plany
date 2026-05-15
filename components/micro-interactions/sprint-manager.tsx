@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Fire01Icon, Coffee01Icon } from '@hugeicons/core-free-icons'
+import { FireIcon, Coffee01Icon } from '@hugeicons/core-free-icons'
 
 interface SprintManagerProps {
   intervalMinutes?: number;
