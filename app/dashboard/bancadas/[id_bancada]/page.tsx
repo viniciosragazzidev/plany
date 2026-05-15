@@ -124,6 +124,7 @@ export default async function BenchDetailPage({
             benchId={bench.id}
             editalItems={items as any}
             subjects={benchSubjects as any}
+            materials={benchMaterials as any}
           />
         </div>
       </div>

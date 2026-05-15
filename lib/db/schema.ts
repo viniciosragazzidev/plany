@@ -219,6 +219,22 @@ export const quizAttempts = pgTable("quiz_attempts", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// --- Summaries System ---
+
+export const summaries = pgTable("summaries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  benchId: uuid("bench_id")
+    .notNull()
+    .references(() => studyBenches.id, { onDelete: "cascade" }),
+  subjectId: uuid("subject_id")
+    .notNull()
+    .references(() => subjects.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  content: text("content").notNull(), // Structured JSON content
+  materialsHash: text("materials_hash").notNull(), // Hash of material IDs used
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // --- Flashcards System ---
 
 export const flashcards = pgTable("flashcards", {
@@ -254,7 +270,7 @@ export const materialChunks = pgTable("material_chunks", {
     .notNull()
     .references(() => materials.id, { onDelete: "cascade" }),
   content: text("content").notNull(),
-  embedding: vector("embedding", { dimensions: 3072 }),
+  embedding: vector("embedding", { dimensions: 768 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => {
   return {
@@ -268,7 +284,7 @@ export const semanticCache = pgTable("semantic_cache", {
     .notNull()
     .references(() => studyBenches.id, { onDelete: "cascade" }),
   query: text("query").notNull(),
-  queryEmbedding: vector("query_embedding", { dimensions: 3072 }),
+  queryEmbedding: vector("query_embedding", { dimensions: 768 }),
   response: text("response").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => {
