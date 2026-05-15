@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, boolean, uuid, pgEnum, date } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, boolean, uuid, pgEnum, date, index, vector } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
 	id: text("id").primaryKey(),
@@ -216,4 +216,33 @@ export const quizAttempts = pgTable("quiz_attempts", {
   isCorrect: boolean("is_correct").notNull(),
   confidenceLevel: confidenceLevelEnum("confidence_level"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const materialChunks = pgTable("material_chunks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  materialId: uuid("material_id")
+    .notNull()
+    .references(() => materials.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  embedding: vector("embedding", { dimensions: 1536 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    embeddingIndex: index("embeddingIndex").using("hnsw", table.embedding.op("vector_cosine_ops")),
+  };
+});
+
+export const semanticCache = pgTable("semantic_cache", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  benchId: uuid("bench_id")
+    .notNull()
+    .references(() => studyBenches.id, { onDelete: "cascade" }),
+  query: text("query").notNull(),
+  queryEmbedding: vector("query_embedding", { dimensions: 1536 }),
+  response: text("response").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    queryEmbeddingIndex: index("queryEmbeddingIndex").using("hnsw", table.queryEmbedding.op("vector_cosine_ops")),
+  };
 });

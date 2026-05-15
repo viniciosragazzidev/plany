@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
-import { studyBenches, subjects, materials, profiles, editalItems } from "@/lib/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
-import { differenceInDays } from "date-fns";
+import { studyBenches, subjects, materials, profiles, editalItems, materialChunks, semanticCache } from "@/lib/db/schema";
+import { eq, and, inArray, sql, desc, gt } from "drizzle-orm";
+import { getEmbedding } from "@/lib/ai-optimizations";
 
 export const maxDuration = 30;
 
@@ -34,7 +34,29 @@ export async function POST(req: NextRequest) {
       isEditalConsultantMode?: boolean
     } = await req.json();
 
-    // 1. Buscar Informações Detalhadas da Bancada
+    const lastUserMessage = messages.filter(m => m.role === "user").pop()?.content || "";
+
+    // 1. Semantic Cache Check
+    if (!isEditalConsultantMode && lastUserMessage) {
+      const queryEmbedding = await getEmbedding(lastUserMessage);
+      
+      const [cachedResponse] = await db
+        .select({
+          response: semanticCache.response,
+          similarity: sql<number>`1 - (${semanticCache.queryEmbedding} <=> ${JSON.stringify(queryEmbedding)}::vector)`
+        })
+        .from(semanticCache)
+        .where(eq(semanticCache.benchId, benchId))
+        .orderBy(t => desc(t.similarity))
+        .limit(1);
+
+      if (cachedResponse && cachedResponse.similarity > 0.95) {
+        console.log("CACHE HIT (Semantic):", cachedResponse.similarity);
+        return NextResponse.json({ content: cachedResponse.response, isCached: true });
+      }
+    }
+
+    // 2. Buscar Informações Detalhadas da Bancada
     const bench = await db.query.studyBenches.findFirst({
       where: eq(studyBenches.id, benchId),
     });
@@ -75,88 +97,41 @@ ${editalContent}
 Idioma: Português do Brasil.`;
 
     } else {
-      // --- MODO TUTOR PADRÃO (LOGICA EXISTENTE) ---
-      // Determine which subjects to show as context
-      const benchSubjects = await db.query.subjects.findMany({
-        where: selectedSubjectIds && selectedSubjectIds.length > 0
-          ? and(eq(subjects.benchId, benchId), inArray(subjects.id, selectedSubjectIds))
-          : eq(subjects.benchId, benchId),
-      });
+      // --- MODO TUTOR PADRÃO (RAG CIRÚRGICO) ---
+      const queryEmbedding = await getEmbedding(lastUserMessage);
 
-      const subjectIds = benchSubjects.map(s => s.id);
-
-      // Fetch edital items for these subjects
-      const benchEditalItems = await db.query.editalItems.findMany({
-        where: eq(editalItems.benchId, benchId),
-      });
-
-      // Filter edital items that match the selected subjects
-      const filteredEditalItems = benchEditalItems.filter(item => 
-        benchSubjects.some(s => 
-          item.category.toLowerCase().includes(s.title.toLowerCase()) || 
-          s.title.toLowerCase().includes(item.category.toLowerCase())
-        )
-      );
-
-      // Fetch materials for these subjects
-      const benchMaterials = await db
+      // Retrieval: Get Top 5 relevant chunks from materials in this bench
+      const relevantChunks = await db
         .select({
-          id: materials.id,
-          title: materials.title,
-          type: materials.type,
-          content: materials.content,
-          subjectId: materials.subjectId,
-          editalItemId: materials.editalItemId,
+          content: materialChunks.content,
+          materialTitle: materials.title,
+          similarity: sql<number>`1 - (${materialChunks.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector)`
         })
-        .from(materials)
+        .from(materialChunks)
+        .innerJoin(materials, eq(materialChunks.materialId, materials.id))
         .where(
-          selectedSubjectIds && selectedSubjectIds.length > 0
-            ? and(eq(materials.benchId, benchId), inArray(materials.subjectId, selectedSubjectIds))
-            : eq(materials.benchId, benchId)
-        );
+          and(
+            eq(materials.benchId, benchId),
+            selectedSubjectIds && selectedSubjectIds.length > 0 
+              ? inArray(materials.subjectId, selectedSubjectIds)
+              : undefined
+          )
+        )
+        .orderBy(t => desc(t.similarity))
+        .limit(5);
 
-      // 2. Preparar Contexto Detalhado (ESTRUTURADO)
-      const today = new Date();
-      
-      // Build a structured tree for the AI
-      const contextTree = benchSubjects.map(subject => {
-        const subjectTopics = filteredEditalItems.filter(item => 
-          item.category.toLowerCase().includes(subject.title.toLowerCase()) || 
-          subject.title.toLowerCase().includes(item.category.toLowerCase())
-        );
-
-        const subjectMaterials = benchMaterials.filter(m => m.subjectId === subject.id);
-
-        return {
-          subject: subject.title,
-          priority: subject.priority,
-          topics: subjectTopics.map(t => ({
-            name: t.topic,
-            description: t.description,
-            isCovered: t.isCovered,
-            materials: subjectMaterials.filter(m => m.editalItemId === t.id).map(m => m.title)
-          })),
-          generalMaterials: subjectMaterials.filter(m => !m.editalItemId).map(m => m.title)
-        };
-      });
-
-      const materialContents = benchMaterials
-        .filter(m => m.content)
-        .map(m => {
-          const subject = benchSubjects.find(s => s.id === m.subjectId);
-          return `--- MATERIAL: ${m.title} (${subject?.title || "Geral"}) ---\n${m.content}\n--- FIM DO MATERIAL ---`;
-        })
+      const contextMaterials = relevantChunks
+        .map(c => `--- MATERIAL: ${c.materialTitle} ---\n${c.content}`)
         .join("\n\n");
 
-      const contextStatus = selectedSubjectIds && selectedSubjectIds.length > 0
-          ? `FOCO ATIVO: O usuário selecionou especificamente as seguintes matérias: ${benchSubjects.map(s => s.title).join(", ")}. 
-             Dê prioridade total a esses assuntos e seus respectivos materiais.`
-          : "CONTEXTO AMPLO: O usuário está visualizando todas as matérias da bancada.";
+      const benchSubjects = await db.query.subjects.findMany({
+        where: eq(subjects.benchId, benchId)
+      });
 
       systemPrompt = `Você é o PLANY, o parceiro de estudos definitivo e tutor de IA da plataforma.
 Sua missão é guiar o usuário rumo à aprovação com foco total nos materiais que ele mesmo subiu.
 
-HOJE É: ${today.toLocaleDateString('pt-BR')}
+HOJE É: ${new Date().toLocaleDateString('pt-BR')}
 
 ---
 
@@ -165,34 +140,26 @@ HOJE É: ${today.toLocaleDateString('pt-BR')}
 - **BANCA:** ${bench.examBoard || "Não informada"}
 - **DATA DA PROVA:** ${bench.targetDate}
 
-### 🟢 STATUS DO CONTEXTO (O QUE O USUÁRIO ESTÁ VENDO AGORA):
-${contextStatus}
-
-### 📚 ESTRUTURA DE ESTUDOS (SUA FONTE DE VERDADE):
-${JSON.stringify(contextTree, null, 2)}
-
-### 📄 CONTEÚDO DOS MATERIAIS (BASE PARA RESPOSTAS):
-${materialContents || "Sem conteúdos específicos carregados para o contexto atual."}
+### 📄 CONTEÚDO RELEVANTE (RECUPERADO VIA RAG):
+${contextMaterials || "Sem conteúdos específicos relevantes encontrados para esta pergunta."}
 
 ---
 
 ### 🕹️ PERSONALIDADE E DIRETRIZES:
-1. **Diferencie Matéria de Assunto:** Uma "Matéria" (ex: Português) contém vários "Assuntos" (ex: Concordância). Quando o usuário perguntar quais assuntos ele tem selecionado, liste os Assuntos (topics) dentro das Matérias (subjects) que estão no Foco Ativo.
-2. **O Material é o Chefe:** Use prioritariamente o conteúdo dos materiais. Se não houver material sobre um assunto, avise e ofereça usar seu conhecimento geral.
-3. **Markdown de Elite:** Use tabelas para comparativos, listas para passos e negrito para termos chave.
-4. **Citação Obrigatória:** Sempre cite o nome do material ao usar sua informação.
+1. **O Material é o Chefe:** Use prioritariamente os trechos de materiais fornecidos acima.
+2. **Markdown de Elite:** Use tabelas para comparativos, listas para passos e negrito para termos chave.
+3. **Citação Obrigatória:** Sempre cite o nome do material ao usar sua informação.
+4. **Resumo:** Se não houver informação nos materiais, use seu conhecimento geral mas avise o usuário.
 
 Idioma: Português do Brasil.`;
     }
 
-    // 3. Formatar Mensagens (Garantindo que o Gemini entenda o histórico e o sistema)
-    // O novo SDK @google/genai espera objetos estruturados
+    // 3. Formatar Mensagens
     const contents = messages.map((m: any) => ({
       role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: m.content }],
     }));
 
-    // Chamada ajustada para o novo SDK garantir que a systemInstruction seja lida
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash", 
       contents: contents,
@@ -203,7 +170,20 @@ Idioma: Português do Brasil.`;
       }
     });
 
-    return NextResponse.json({ content: response.text });
+    const responseText = response.text;
+
+    // 4. Save to Semantic Cache (Async)
+    if (!isEditalConsultantMode && lastUserMessage && responseText) {
+      const queryEmbedding = await getEmbedding(lastUserMessage);
+      db.insert(semanticCache).values({
+        benchId,
+        query: lastUserMessage,
+        queryEmbedding,
+        response: responseText,
+      }).catch(err => console.error("Erro ao salvar cache semântico:", err));
+    }
+
+    return NextResponse.json({ content: responseText });
   } catch (error: any) {
     console.error("Erro na Rota de Chat:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

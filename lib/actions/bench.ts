@@ -1,8 +1,8 @@
 'use server'
 
 import { db } from "@/lib/db";
-import { studyBenches, editalItems, materials, subjects, webSources } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { studyBenches, editalItems, materials, subjects, webSources, materialChunks } from "@/lib/db/schema";
+import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 // @ts-expect-error: pdf-parse-fork lacks type definitions
 import pdf from 'pdf-parse-fork';
@@ -10,6 +10,7 @@ import { GoogleGenAI } from "@google/genai";
 import { generateSearchQueries, QueryGenInput } from "@/lib/web-research";
 import { htmlToMarkdown } from "@/lib/markdown-converter";
 import { scrapeSearchResults, calculateAuthorityScore } from "@/lib/web-scraper";
+import { chunkMarkdown, getEmbedding } from "@/lib/ai-optimizations";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const ai = new GoogleGenAI({ apiKey: apiKey || "" });
@@ -110,6 +111,24 @@ export async function processEditalPDF(formData: FormData) {
             weight: item.weight || 1,
           });
         }
+      }
+
+      // STEP: Save Edital as a Vectorized Material for RAG
+      const [editalMaterial] = await tx.insert(materials).values({
+        benchId,
+        title: "Edital Oficial",
+        type: "text",
+        content: editalMarkdown,
+      }).returning();
+
+      const chunks = chunkMarkdown(editalMarkdown);
+      for (const chunk of chunks) {
+        const embedding = await getEmbedding(chunk);
+        await tx.insert(materialChunks).values({
+          materialId: editalMaterial.id,
+          content: chunk,
+          embedding: embedding,
+        });
       }
     });
 
@@ -308,6 +327,23 @@ export async function addMaterial(formData: FormData) {
       content,
       isPinned,
     }).returning();
+
+    // STEP: Surgical RAG - Chunking and Vectorization
+    if (content) {
+      const chunks = chunkMarkdown(content);
+      for (const chunk of chunks) {
+        try {
+          const embedding = await getEmbedding(chunk);
+          await db.insert(materialChunks).values({
+            materialId: material.id,
+            content: chunk,
+            embedding: embedding,
+          });
+        } catch (err) {
+          console.error(`Erro ao vetorizar chunk do material ${material.id}:`, err);
+        }
+      }
+    }
 
     revalidatePath(`/dashboard/bancadas/${benchId}`);
     return { success: true, materialId: material.id };
@@ -736,7 +772,7 @@ export async function importWebMaterials(webSourceIds: string[]) {
           }
         }
 
-        const material = await db
+        const [material] = await db
           .insert(materials)
           .values({
             benchId,
@@ -750,6 +786,23 @@ export async function importWebMaterials(webSourceIds: string[]) {
             contentVectorRef: `web_source_${source.id}`,
           })
           .returning();
+
+        // STEP: Surgical RAG - Chunking and Vectorization
+        if (source.markdownContent) {
+          const chunks = chunkMarkdown(source.markdownContent);
+          for (const chunk of chunks) {
+            try {
+              const embedding = await getEmbedding(chunk);
+              await db.insert(materialChunks).values({
+                materialId: material.id,
+                content: chunk,
+                embedding: embedding,
+              });
+            } catch (err) {
+              console.error(`Erro ao vetorizar chunk do material importado ${material.id}:`, err);
+            }
+          }
+        }
 
         // Update web source status
         await db
