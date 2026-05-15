@@ -65,7 +65,7 @@ Gere queries Google Dorks para encontrar materiais de estudo em Português (Bras
     });
 
     const text = response.text;
-    if (!text) throw new Error("IA não retornou uma resposta válida.");
+    if (!text) throw new Error("IA não retornou uma resposta válida. Tente novamente!");
 
     // Clean JSON response
     const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
