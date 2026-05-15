@@ -280,7 +280,8 @@ export function IntelligenceTools({ targetDate, weeklyHours, benchId, editalItem
                         />
                         <Label 
                           htmlFor={item.id}
-                          className="text-[11px] leading-tight cursor-pointer font-medium text-muted-foreground hover:text-foreground transition-colors"
+                          className="text-[11px] leading-tight cursor-pointer font-medium text-muted-foreground hover:text-foreground transition-colors truncate max-w-[calc(100%-2rem)]"
+                          title={item.topic}
                         >
                           {item.topic}
                         </Label>

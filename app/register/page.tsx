@@ -67,7 +67,7 @@ export default function Register() {
                 required
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:outline-none focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-input bg-background py-2 px-3 shadow-sm focus:outline-none focus:ring-blue-500"
                 placeholder="João"
               />
             </div>
@@ -81,7 +81,7 @@ export default function Register() {
                 required
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:outline-none focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-input bg-background py-2 px-3 shadow-sm focus:outline-none focus:ring-blue-500"
                 placeholder="Silva"
               />
               </div>
@@ -96,7 +96,7 @@ export default function Register() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:outline-none focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-input bg-background py-2 px-3 shadow-sm focus:outline-none focus:ring-blue-500"
                 placeholder="seu@email.com"
               />
             </div>
@@ -110,7 +110,7 @@ export default function Register() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:outline-none focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-input bg-background py-2 px-3 shadow-sm focus:outline-none focus:ring-blue-500"
                 placeholder="••••••••"
               />
             </div>
