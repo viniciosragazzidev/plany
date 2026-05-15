@@ -13,6 +13,7 @@ import { Highlight } from "@tiptap/extension-highlight"
 import { Subscript } from "@tiptap/extension-subscript"
 import { Superscript } from "@tiptap/extension-superscript"
 import { Selection } from "@tiptap/extensions"
+import { Markdown } from "@tiptap/markdown"
 
 // --- UI Primitives ---
 import { Button } from "@/components/tiptap-ui-primitive/button"
@@ -230,17 +231,19 @@ export function SimpleEditor({ initialContent, onChange }: SimpleEditorProps) {
         upload: handleImageUpload,
         onError: (error) => console.error("Upload failed:", error),
       }),
+      Markdown,
     ],
     content: initialContent || "",
+    contentType: "markdown",
     onUpdate: ({ editor }) => {
-      onChange?.(editor.getHTML());
+      onChange?.(editor.getMarkdown());
     },
   })
 
   // Update content if initialContent changes (e.g. when switching notes)
   useEffect(() => {
-    if (editor && initialContent !== undefined && initialContent !== editor.getHTML()) {
-      editor.commands.setContent(initialContent);
+    if (editor && initialContent !== undefined && initialContent !== editor.getMarkdown()) {
+      editor.commands.setContent(initialContent, { emitUpdate: false });
     }
   }, [initialContent, editor]);
 
