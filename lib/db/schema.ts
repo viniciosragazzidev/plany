@@ -164,3 +164,56 @@ export const notifications = pgTable("notifications", {
   link: text("link"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const quizStatusEnum = pgEnum("quiz_status", ["generating", "ready", "failed"]);
+export const confidenceLevelEnum = pgEnum("confidence_level", ["certo", "duvidoso", "chutando"]);
+
+export const quizzes = pgTable("quizzes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  benchId: uuid("bench_id")
+    .notNull()
+    .references(() => studyBenches.id),
+  subjectId: uuid("subject_id")
+    .notNull()
+    .references(() => subjects.id),
+  title: text("title").notNull(),
+  status: quizStatusEnum("status").default("generating").notNull(),
+  score: integer("score"), // % de acerto final
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const questions = pgTable("questions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  quizId: uuid("quiz_id")
+    .notNull()
+    .references(() => quizzes.id, { onDelete: "cascade" }),
+  editalItemId: uuid("edital_item_id")
+    .references(() => editalItems.id), // Referência granular ao tópico
+  content: text("content").notNull(), // Pergunta em Markdown
+  explanation: text("explanation").notNull(), // Explicação da resposta correta
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const options = pgTable("options", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  questionId: uuid("question_id")
+    .notNull()
+    .references(() => questions.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  isCorrect: boolean("is_correct").default(false).notNull(),
+});
+
+export const quizAttempts = pgTable("quiz_attempts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  quizId: uuid("quiz_id")
+    .notNull()
+    .references(() => quizzes.id, { onDelete: "cascade" }),
+  questionId: uuid("question_id")
+    .notNull()
+    .references(() => questions.id, { onDelete: "cascade" }),
+  selectedOptionId: uuid("selected_option_id")
+    .references(() => options.id, { onDelete: "set null" }),
+  isCorrect: boolean("is_correct").notNull(),
+  confidenceLevel: confidenceLevelEnum("confidence_level"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

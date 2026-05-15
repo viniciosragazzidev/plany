@@ -10,7 +10,8 @@ import {
   UserIcon,
   SparklesIcon,
   InformationCircleIcon,
-  ZapIcon
+  ZapIcon,
+  BrainIcon
 } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,16 +33,38 @@ export function ChatBench() {
   const params = useParams();
   const benchId = params.id_bancada as string;
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { selectedContextSubjects } = useBench();
+  const { 
+    selectedContextSubjects, 
+    externalMessage, 
+    setExternalMessage,
+    isEditalConsultantMode
+  } = useBench();
 
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Olá! Sou seu tutor acadêmico. Como posso ajudar nos seus estudos hoje?' }
+    { 
+      role: 'assistant', 
+      content: isEditalConsultantMode 
+        ? 'Olá! Sou seu Consultor de Edital. Estou pronto para analisar o seu edital e te dizer o que realmente importa. O que você quer saber?' 
+        : 'Olá! Sou seu tutor acadêmico. Como posso ajudar nos seus estudos hoje?' 
+    }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
-  const LOADING_MESSAGES = [
+  useEffect(() => {
+    if (externalMessage) {
+      handleSend(externalMessage);
+      setExternalMessage(null);
+    }
+  }, [externalMessage]);
+
+  const LOADING_MESSAGES = isEditalConsultantMode ? [
+    "Analisando regras do edital...",
+    "Buscando critérios de pontuação...",
+    "Verificando datas e requisitos...",
+    "Sintetizando o que importa..."
+  ] : [
     "Consultando seus materiais...",
     "Preparando uma explicação clara...",
     "Buscando as melhores referências...",
@@ -66,14 +89,15 @@ export function ChatBench() {
     scrollToBottom();
   }, [messages, isLoading]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = async (overrideMessage?: string) => {
+    const messageContent = overrideMessage || input;
+    if (!messageContent.trim() || isLoading) return;
 
-    const userMessage: Message = { role: 'user', content: input };
+    const userMessage: Message = { role: 'user', content: messageContent };
     const newMessages = [...messages, userMessage];
     
     setMessages(newMessages);
-    setInput('');
+    if (!overrideMessage) setInput('');
     setIsLoading(true);
 
     const startTime = Date.now();
@@ -86,6 +110,7 @@ export function ChatBench() {
           messages: newMessages,
           benchId: benchId,
           selectedSubjectIds: selectedContextSubjects,
+          isEditalConsultantMode: isEditalConsultantMode
         }),
       });
 
@@ -223,7 +248,14 @@ export function ChatBench() {
       {/* Input Area */}
       <div className="p-6 bg-gradient-to-t from-background via-background to-transparent pt-10">
         <div className="max-w-3xl mx-auto w-full space-y-4">
-          {selectedContextSubjects.length > 0 && (
+          {isEditalConsultantMode ? (
+            <div className="flex justify-center">
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 gap-1.5 py-1.5 px-4 rounded-full text-[10px] font-bold animate-in fade-in zoom-in duration-300 shadow-lg shadow-primary/10">
+                <HugeiconsIcon icon={BrainIcon} size={14} className="animate-pulse" />
+                MODO CONSULTOR: Foco Total no Edital
+              </Badge>
+            </div>
+          ) : selectedContextSubjects.length > 0 && (
             <div className="flex justify-center">
               <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 gap-1.5 py-1 px-3 rounded-full text-[10px] font-bold animate-in fade-in zoom-in duration-300">
                 <div className="size-1.5 rounded-full bg-primary animate-pulse" />
@@ -234,7 +266,7 @@ export function ChatBench() {
           
           <div className="relative group">
             <Input 
-              placeholder="Tire suas dúvidas sobre o conteúdo..."
+              placeholder={isEditalConsultantMode ? "Pergunte sobre datas, pesos, critérios..." : "Tire suas dúvidas sobre o conteúdo..."}
               className="h-14 pl-6 pr-16 rounded-2xl bg-secondary/10 border-border/50 focus:bg-background transition-all shadow-sm group-focus-within:shadow-xl group-focus-within:shadow-primary/5 text-sm"
               value={input}
               disabled={isLoading}
@@ -244,7 +276,7 @@ export function ChatBench() {
             <Button 
               size="icon-sm" 
               className="absolute right-2.5 top-2.5 rounded-xl h-9 w-9 transition-all active:scale-90"
-              onClick={handleSend}
+              onClick={() => handleSend()}
               disabled={isLoading || !input.trim()}
             >
               {isLoading ? (

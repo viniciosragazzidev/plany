@@ -126,6 +126,7 @@ export default async function BenchDetailPage({
             weeklyHours={bench.weeklyHours}
             benchId={bench.id}
             editalItems={items as any}
+            subjects={benchSubjects as any}
           />
         </div>
       </div>

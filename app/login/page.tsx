@@ -39,7 +39,7 @@ export default function Login() {
 
   return (
     <div className="flex flex-col flex-1 items-center justify-center font-sans h-[calc(100vh-44px)]">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center gap-4 justify-between py-32 px-16 shadow-sm  shadow-zinc-200/20 dark:shadow-zinc-800/20 bg-white/30 dark:bg-black/30 sm:items-start">
+      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-around py-32 px-16 shadow-sm  shadow-zinc-200/20 dark:shadow-zinc-800/20 bg-white/30 dark:bg-black/30 sm:items-start">
       <Logo className="right-1 relative" />
         <div className="flex flex-col items-center gap-2 text-center sm:items-start sm:text-left">
           <h1 className="max-w-md text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
@@ -50,7 +50,7 @@ export default function Login() {
           </p>
         </div>
         
-        <form onSubmit={handleLogin} className="flex flex-col justify-center gap-4 text-base font-medium w-full sm:w-[400px] pt-5">
+        <form onSubmit={handleLogin} className="flex flex-col justify-center gap-4 text-base font-medium w-full sm:w-[400px] ">
             {error && <p className="text-destructive text-sm font-medium">{error}</p>}
             <div className="input-area max-w-xs flex flex-col gap-1">
               <Label htmlFor="email">

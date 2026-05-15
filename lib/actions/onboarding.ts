@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { profiles, studyBenches, subjects } from "@/lib/db/schema";
+import { profiles, studyBenches, subjects, editalItems } from "@/lib/db/schema";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -16,6 +16,7 @@ export async function completeOnboarding(data: {
   targetDate: string;
   weeklyHours: number;
   subjects: { title: string; priority: number; colorTag: string }[];
+  editalItems?: { category: string; topic: string; description?: string; weight?: number }[];
   examBoard?: string;
   examNotice?: string;
 }) {
@@ -66,6 +67,19 @@ export async function completeOnboarding(data: {
           }))
         );
       }
+
+      // 4. Criar Itens do Edital
+      if (data.editalItems && data.editalItems.length > 0) {
+        await tx.insert(editalItems).values(
+          data.editalItems.map((item) => ({
+            benchId: bench.id,
+            category: item.category,
+            topic: item.topic,
+            description: item.description || "",
+            weight: item.weight || 1,
+          }))
+        );
+      }
     });
     
     revalidatePath("/dashboard");
@@ -83,6 +97,7 @@ export async function createStudyBench(data: {
   targetDate: string;
   weeklyHours: number;
   subjects: { title: string; priority: number; colorTag: string }[];
+  editalItems?: { category: string; topic: string; description?: string; weight?: number }[];
   examBoard?: string;
   examNotice?: string;
 }) {
@@ -126,6 +141,19 @@ export async function createStudyBench(data: {
             title: s.title,
             priority: s.priority,
             colorTag: s.colorTag,
+          }))
+        );
+      }
+
+      // 4. Criar Itens do Edital
+      if (data.editalItems && data.editalItems.length > 0) {
+        await tx.insert(editalItems).values(
+          data.editalItems.map((item) => ({
+            benchId: bench.id,
+            category: item.category,
+            topic: item.topic,
+            description: item.description || "",
+            weight: item.weight || 1,
           }))
         );
       }

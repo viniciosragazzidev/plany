@@ -132,40 +132,54 @@ export async function extractBenchDataFromEdital(formData: FormData) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const data = await pdf(buffer);
-    const fullText = data.text;
+    const rawText = data.text;
 
-    const textSample = fullText.length > 40000 
-      ? `${fullText.substring(0, 30000)}\n\n[...]\n\n${fullText.substring(fullText.length - 10000)}`
-      : fullText;
+    // STEP 1: Conversion to High-Quality Markdown for RAG/Consultant
+    const mdSystemPrompt = `Você é um Analista Acadêmico especializado em conversão de documentos.
+    Sua missão é converter o texto bruto de um edital em Markdown estruturado de alta qualidade.
+    - Preserve headers (# para títulos principais, ## para sub-tópicos)
+    - Formate tabelas de cronogramas e critérios de pontuação
+    - Preserve listas de conteúdo programático
+    - Remova ruídos de metadados do PDF
+    - Retorne apenas o Markdown.`;
 
-    const prompt = `Analise o texto deste edital de concurso e extraia as seguintes informações básicas para criar uma bancada de estudos:
-    1. Nome do Concurso/Prova (objetivo)
-    2. BANCA: Nome da instituição organizadora (ex: FGV, CESPE, Vunesp, etc).
-    3. DATA DA PROVA: Procure exaustivamente por datas associadas a "aplicação da prova", "data da prova", "realização da prova", "data do exame" ou "cronograma". É comum estar em tabelas de cronograma no início ou final do documento. Se encontrar, retorne no formato YYYY-MM-DD.
-    4. Sugestão de carga horária semanal (baseado na complexidade, entre 10-40h)
-    5. Lista das principais DISCIPLINAS (matérias) mencionadas no conteúdo programático.
+    const mdResponse = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: `TEXTO BRUTO PARA CONVERTER:\n${rawText.substring(0, 25000)}` }] }],
+      config: {
+        systemInstruction: {
+          parts: [{ text: mdSystemPrompt }]
+        }
+      }
+    });
 
-    TEXTO DO EDITAL:
-    ${textSample}`;
+    const editalMarkdown = mdResponse.text;
+    if (!editalMarkdown) throw new Error("Falha na conversão para Markdown");
 
-    const systemPrompt = `Você é um Analista Acadêmico especializado em extração de metadados de editais.
-    Sua missão é fornecer dados básicos para criação de um plano de estudos.
-    IMPORTANTE: Para a data da prova, se houver várias (ex: objetiva e discursiva), escolha a PRIMEIRA. Se não encontrar uma data clara, deixe o campo "targetDate" vazio ou nulo.
-    Retorne APENAS um JSON válido (sem blocos markdown) no seguinte formato:
+    // STEP 2: Extraction of Metadata AND Structured Topics
+    const extractSystemPrompt = `Você é um Analista Acadêmico especializado em extração de dados estruturados.
+    Sua missão é extrair o CONTEÚDO PROGRAMÁTICO e METADADOS de editais para configurar um plano de estudos.
+    
+    Retorne APENAS um JSON válido no seguinte formato:
     {
-      "goalName": "Nome do Concurso",
-      "examBoard": "Nome da Banca",
-      "targetDate": "YYYY-MM-DD",
-      "weeklyHours": 20,
-      "subjects": ["Disciplina 1", "Disciplina 2"]
+      "metadata": {
+        "goalName": "Nome do Concurso",
+        "examBoard": "Banca (ex: FGV, CESPE, Vunesp)",
+        "targetDate": "YYYY-MM-DD",
+        "weeklyHours": 20
+      },
+      "subjects": ["Disciplina 1", "Disciplina 2"],
+      "items": [
+        { "category": "Nome da Disciplina", "topic": "Nome do Tópico", "description": "Breve detalhamento", "weight": 1-5 }
+      ]
     }`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      contents: [{ role: "user", parts: [{ text: `EDITAL EM MARKDOWN:\n${editalMarkdown}` }] }],
       config: {
         systemInstruction: {
-          parts: [{ text: systemPrompt }]
+          parts: [{ text: extractSystemPrompt }]
         }
       }
     });
@@ -174,13 +188,18 @@ export async function extractBenchDataFromEdital(formData: FormData) {
     if (!text) throw new Error("A IA não retornou uma resposta válida.");
     
     const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const dataExtracted = JSON.parse(jsonStr);
+    const { metadata, subjects, items } = JSON.parse(jsonStr);
 
     return { 
       success: true, 
       data: {
-        ...dataExtracted,
-        examNotice: fullText.substring(0, 10000)
+        goalName: metadata.goalName,
+        examBoard: metadata.examBoard,
+        targetDate: metadata.targetDate,
+        weeklyHours: metadata.weeklyHours || 20,
+        subjects: subjects || [],
+        editalItems: items || [],
+        examNotice: editalMarkdown
       } 
     };
   } catch (error: any) {

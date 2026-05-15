@@ -58,6 +58,7 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
     targetDate: undefined as Date | undefined,
     weeklyHours: "20",
     subjects: [] as { title: string; priority: number; colorTag: string }[],
+    editalItems: [] as { category: string; topic: string; description?: string; weight?: number }[],
     examNotice: "",
   });
 
@@ -75,7 +76,7 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
     try {
       const result = await extractBenchDataFromEdital(formDataUpload);
       if (result.success && result.data) {
-        const { goalName, targetDate, examBoard, weeklyHours, subjects, examNotice } = result.data;
+        const { goalName, targetDate, examBoard, weeklyHours, subjects, editalItems, examNotice } = result.data;
         
         let parsedDate = undefined;
         if (targetDate) {
@@ -105,6 +106,7 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
             ...prev.subjects,
             ...(subjects || []).map((s: string) => ({ title: s, priority: 3, colorTag: "#3b82f6" }))
           ],
+          editalItems: editalItems || [],
           examNotice: examNotice || ""
         }));
 
@@ -172,6 +174,9 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
           targetDate: formData.targetDate.toISOString(),
           weeklyHours: parseInt(formData.weeklyHours),
           subjects: formData.subjects,
+          editalItems: formData.editalItems,
+          examBoard: formData.examBoard,
+          examNotice: formData.examNotice,
         });
 
         if (result?.error) {

@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+export type SidebarState = 'default' | 'quiz_list' | 'active_quiz' | 'quiz_config';
+
 interface BenchContextType {
   selectedContextSubjects: string[];
   setSelectedContextSubjects: (subjects: string[]) => void;
@@ -14,6 +16,17 @@ interface BenchContextType {
   researchResults: any[];
   startBackgroundResearch: () => Promise<void>;
   clearResearchResults: () => void;
+  // Sidebar State
+  sidebarState: SidebarState;
+  setSidebarState: (state: SidebarState) => void;
+  activeQuizId: string | null;
+  setActiveQuizId: (id: string | null) => void;
+  isGeneratingQuiz: boolean;
+  setIsGeneratingQuiz: (is: boolean) => void;
+  isEditalConsultantMode: boolean;
+  setIsEditalConsultantMode: (is: boolean) => void;
+  externalMessage: string | null;
+  setExternalMessage: (msg: string | null) => void;
 }
 
 const BenchContext = createContext<BenchContextType | undefined>(undefined);
@@ -51,6 +64,20 @@ export function BenchProvider({
   const [isGlobalResearching, setIsGlobalResearching] = useState(initialResearchStatus === "researching");
   const [researchStatus, setResearchStatus] = useState(initialResearchStatus === "researching" ? "Pesquisando em segundo plano..." : "");
   const [researchResults, setResearchResults] = useState<any[]>([]);
+  
+  // Sidebar State
+  const [sidebarState, setSidebarState] = useState<SidebarState>('default');
+  const [activeQuizId, setActiveQuizId] = useState<string | null>(null);
+  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
+  const [isEditalConsultantMode, setIsEditalConsultantMode] = useState(false);
+  const [externalMessage, setExternalMessage] = useState<string | null>(null);
+
+  // When Consultant Mode is enabled, we clear other context
+  useEffect(() => {
+    if (isEditalConsultantMode) {
+      setSelectedContextSubjects([]);
+    }
+  }, [isEditalConsultantMode]);
 
   // Persistence: Save to localStorage on change
   useEffect(() => {
@@ -123,7 +150,17 @@ export function BenchProvider({
       researchStatus,
       researchResults,
       startBackgroundResearch,
-      clearResearchResults
+      clearResearchResults,
+      sidebarState,
+      setSidebarState,
+      activeQuizId,
+      setActiveQuizId,
+      isGeneratingQuiz,
+      setIsGeneratingQuiz,
+      isEditalConsultantMode,
+      setIsEditalConsultantMode,
+      externalMessage,
+      setExternalMessage
     }}>
       {children}
     </BenchContext.Provider>

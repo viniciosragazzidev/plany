@@ -1,8 +1,8 @@
 'use server'
 
 import { db } from "@/lib/db";
-import { studyBenches, editalItems, materials, subjects, profiles } from "@/lib/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { studyBenches, editalItems, materials, subjects, profiles, quizAttempts, quizzes } from "@/lib/db/schema";
+import { eq, inArray, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { subDays, format, startOfDay } from "date-fns";
@@ -44,10 +44,11 @@ export async function getDashboardData() {
     const benchIds = benches.map(b => b.id);
 
     // 3. Fetch all related data in parallel
-    const [allSubjects, allEditalItems, allMaterials] = await Promise.all([
+    const [allSubjects, allEditalItems, allMaterials, allQuizzes] = await Promise.all([
       db.query.subjects.findMany({ where: inArray(subjects.benchId, benchIds) }),
       db.query.editalItems.findMany({ where: inArray(editalItems.benchId, benchIds) }),
       db.query.materials.findMany({ where: inArray(materials.benchId, benchIds) }),
+      db.query.quizzes.findMany({ where: inArray(quizzes.benchId, benchIds) }),
     ]);
 
     // 4. Calculate Stats
@@ -75,22 +76,43 @@ export async function getDashboardData() {
         }
     }
 
-    // 6. Radar Data (Subject vs % covered)
-    // Map categories from editalItems to progress
-    const subjectProgressMap: Record<string, { total: number, covered: number }> = {};
+    // 6. Radar Data (Average of Coverage % and Quiz % by Subject)
+    const subjectStatsMap: Record<string, { totalTopics: number, coveredTopics: number, totalQuizScore: number, quizCount: number }> = {};
+    
     allEditalItems.forEach(item => {
-      if (!subjectProgressMap[item.category]) {
-        subjectProgressMap[item.category] = { total: 0, covered: 0 };
+      if (!subjectStatsMap[item.category]) {
+        subjectStatsMap[item.category] = { totalTopics: 0, coveredTopics: 0, totalQuizScore: 0, quizCount: 0 };
       }
-      subjectProgressMap[item.category].total++;
-      if (item.isCovered) subjectProgressMap[item.category].covered++;
+      subjectStatsMap[item.category].totalTopics++;
+      if (item.isCovered) subjectStatsMap[item.category].coveredTopics++;
     });
 
-    const radarData = Object.entries(subjectProgressMap).map(([subject, counts]) => ({
-      subject,
-      progress: Math.round((counts.covered / counts.total) * 100),
-      fullMark: 100,
-    })).slice(0, 6); // Top 6 for the radar chart
+    allQuizzes.forEach(quiz => {
+      const subject = allSubjects.find(s => s.id === quiz.subjectId);
+      if (subject && quiz.score !== null) {
+        if (!subjectStatsMap[subject.title]) {
+          subjectStatsMap[subject.title] = { totalTopics: 0, coveredTopics: 0, totalQuizScore: 0, quizCount: 0 };
+        }
+        subjectStatsMap[subject.title].totalQuizScore += quiz.score;
+        subjectStatsMap[subject.title].quizCount++;
+      }
+    });
+
+    const radarData = Object.entries(subjectStatsMap).map(([subject, stats]) => {
+      const coveragePercent = stats.totalTopics > 0 ? (stats.coveredTopics / stats.totalTopics) * 100 : 0;
+      const quizPercent = stats.quizCount > 0 ? (stats.totalQuizScore / stats.quizCount) : 0;
+      
+      // If we have quiz data, weight it (e.g., 60% coverage, 40% quiz)
+      const finalProgress = stats.quizCount > 0 
+        ? Math.round((coveragePercent * 0.6) + (quizPercent * 0.4))
+        : Math.round(coveragePercent);
+
+      return {
+        subject,
+        progress: finalProgress,
+        fullMark: 100,
+      };
+    }).slice(0, 6);
 
     // 7. Activity Data (Last 7 days)
     const last7Days = Array.from({ length: 7 }, (_, i) => {
@@ -104,13 +126,19 @@ export async function getDashboardData() {
     });
 
     // 8. Pending Subjects (Lowest progress)
-    const pendingSubjects = Object.entries(subjectProgressMap)
-      .map(([title, counts]) => {
+    const pendingSubjects = Object.entries(subjectStatsMap)
+      .map(([title, stats]) => {
           const subjectInfo = allSubjects.find(s => s.title === title);
+          const coveragePercent = stats.totalTopics > 0 ? (stats.coveredTopics / stats.totalTopics) * 100 : 0;
+          const quizPercent = stats.quizCount > 0 ? (stats.totalQuizScore / stats.quizCount) : 0;
+          const finalProgress = stats.quizCount > 0 
+            ? Math.round((coveragePercent * 0.6) + (quizPercent * 0.4))
+            : Math.round(coveragePercent);
+
           return {
               id: subjectInfo?.id || title,
               title,
-              progress: Math.round((counts.covered / counts.total) * 100),
+              progress: finalProgress,
               colorTag: subjectInfo?.colorTag || "#ccc",
               benchId: subjectInfo?.benchId
           };

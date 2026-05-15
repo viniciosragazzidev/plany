@@ -22,7 +22,17 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { messages, benchId, selectedSubjectIds }: { messages: any[], benchId: string, selectedSubjectIds?: string[] } = await req.json();
+    const { 
+      messages, 
+      benchId, 
+      selectedSubjectIds, 
+      isEditalConsultantMode 
+    }: { 
+      messages: any[], 
+      benchId: string, 
+      selectedSubjectIds?: string[],
+      isEditalConsultantMode?: boolean
+    } = await req.json();
 
     // 1. Buscar Informações Detalhadas da Bancada
     const bench = await db.query.studyBenches.findFirst({
@@ -33,84 +43,117 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Bancada não encontrada" }, { status: 404 });
     }
 
-    // Determine which subjects to show as context
-    const benchSubjects = await db.query.subjects.findMany({
-      where: selectedSubjectIds && selectedSubjectIds.length > 0
-        ? and(eq(subjects.benchId, benchId), inArray(subjects.id, selectedSubjectIds))
-        : eq(subjects.benchId, benchId),
-    });
+    let systemPrompt = "";
 
-    const subjectIds = benchSubjects.map(s => s.id);
+    if (isEditalConsultantMode) {
+      // --- MODO CONSULTOR DE EDITAL ---
+      const editalContent = bench.examNotice || bench.examNoticeRaw || "Conteúdo do edital não disponível.";
+      
+      systemPrompt = `Você é o CONSULTOR DE EDITAL da plataforma PLANY.
+Sua única missão agora é ajudar o candidato a entender o seu edital e o que realmente importa para a aprovação.
 
-    // Fetch edital items for these subjects
-    const benchEditalItems = await db.query.editalItems.findMany({
-      where: eq(editalItems.benchId, benchId),
-    });
+HOJE É: ${new Date().toLocaleDateString('pt-BR')}
 
-    // Filter edital items that match the selected subjects
-    const filteredEditalItems = benchEditalItems.filter(item => 
-      benchSubjects.some(s => 
-        item.category.toLowerCase().includes(s.title.toLowerCase()) || 
-        s.title.toLowerCase().includes(item.category.toLowerCase())
-      )
-    );
+---
 
-    // Fetch materials for these subjects
-    const benchMaterials = await db
-      .select({
-        id: materials.id,
-        title: materials.title,
-        type: materials.type,
-        content: materials.content,
-        subjectId: materials.subjectId,
-        editalItemId: materials.editalItemId,
-      })
-      .from(materials)
-      .where(
-        selectedSubjectIds && selectedSubjectIds.length > 0
-          ? and(eq(materials.benchId, benchId), inArray(materials.subjectId, selectedSubjectIds))
-          : eq(materials.benchId, benchId)
+### 🏛️ EDITAL EM CONSULTA:
+- **PROVA/CONCURSO:** ${bench.goalName}
+- **BANCA:** ${bench.examBoard || "Não informada"}
+- **DATA DA PROVA:** ${bench.targetDate}
+
+### 📄 CONTEÚDO DO EDITAL (SUA ÚNICA FONTE):
+${editalContent}
+
+---
+
+### 🕹️ DIRETRIZES DO CONSULTOR:
+1. **Foco Total no Edital:** Responda apenas com base no edital fornecido. Se o usuário perguntar algo fora do edital, lembre-o que você está no "Modo Consultor de Edital".
+2. **Resumos Práticos:** O candidato quer saber o que cai, como cai e quais as regras. Seja direto e use listas/tabelas para facilitar a leitura.
+3. **Prazos e Critérios:** Dê atenção especial a datas, critérios de desempate, pesos de cada matéria e regras de eliminação.
+4. **Análise Estratégica:** Aponte o que parece ser mais importante com base nos pesos e quantidade de questões informadas.
+
+Idioma: Português do Brasil.`;
+
+    } else {
+      // --- MODO TUTOR PADRÃO (LOGICA EXISTENTE) ---
+      // Determine which subjects to show as context
+      const benchSubjects = await db.query.subjects.findMany({
+        where: selectedSubjectIds && selectedSubjectIds.length > 0
+          ? and(eq(subjects.benchId, benchId), inArray(subjects.id, selectedSubjectIds))
+          : eq(subjects.benchId, benchId),
+      });
+
+      const subjectIds = benchSubjects.map(s => s.id);
+
+      // Fetch edital items for these subjects
+      const benchEditalItems = await db.query.editalItems.findMany({
+        where: eq(editalItems.benchId, benchId),
+      });
+
+      // Filter edital items that match the selected subjects
+      const filteredEditalItems = benchEditalItems.filter(item => 
+        benchSubjects.some(s => 
+          item.category.toLowerCase().includes(s.title.toLowerCase()) || 
+          s.title.toLowerCase().includes(item.category.toLowerCase())
+        )
       );
 
-    // 2. Preparar Contexto Detalhado (ESTRUTURADO)
-    const today = new Date();
-    
-    // Build a structured tree for the AI
-    const contextTree = benchSubjects.map(subject => {
-      const subjectTopics = filteredEditalItems.filter(item => 
-        item.category.toLowerCase().includes(subject.title.toLowerCase()) || 
-        subject.title.toLowerCase().includes(item.category.toLowerCase())
-      );
+      // Fetch materials for these subjects
+      const benchMaterials = await db
+        .select({
+          id: materials.id,
+          title: materials.title,
+          type: materials.type,
+          content: materials.content,
+          subjectId: materials.subjectId,
+          editalItemId: materials.editalItemId,
+        })
+        .from(materials)
+        .where(
+          selectedSubjectIds && selectedSubjectIds.length > 0
+            ? and(eq(materials.benchId, benchId), inArray(materials.subjectId, selectedSubjectIds))
+            : eq(materials.benchId, benchId)
+        );
 
-      const subjectMaterials = benchMaterials.filter(m => m.subjectId === subject.id);
+      // 2. Preparar Contexto Detalhado (ESTRUTURADO)
+      const today = new Date();
+      
+      // Build a structured tree for the AI
+      const contextTree = benchSubjects.map(subject => {
+        const subjectTopics = filteredEditalItems.filter(item => 
+          item.category.toLowerCase().includes(subject.title.toLowerCase()) || 
+          subject.title.toLowerCase().includes(item.category.toLowerCase())
+        );
 
-      return {
-        subject: subject.title,
-        priority: subject.priority,
-        topics: subjectTopics.map(t => ({
-          name: t.topic,
-          description: t.description,
-          isCovered: t.isCovered,
-          materials: subjectMaterials.filter(m => m.editalItemId === t.id).map(m => m.title)
-        })),
-        generalMaterials: subjectMaterials.filter(m => !m.editalItemId).map(m => m.title)
-      };
-    });
+        const subjectMaterials = benchMaterials.filter(m => m.subjectId === subject.id);
 
-    const materialContents = benchMaterials
-      .filter(m => m.content)
-      .map(m => {
-        const subject = benchSubjects.find(s => s.id === m.subjectId);
-        return `--- MATERIAL: ${m.title} (${subject?.title || "Geral"}) ---\n${m.content}\n--- FIM DO MATERIAL ---`;
-      })
-      .join("\n\n");
+        return {
+          subject: subject.title,
+          priority: subject.priority,
+          topics: subjectTopics.map(t => ({
+            name: t.topic,
+            description: t.description,
+            isCovered: t.isCovered,
+            materials: subjectMaterials.filter(m => m.editalItemId === t.id).map(m => m.title)
+          })),
+          generalMaterials: subjectMaterials.filter(m => !m.editalItemId).map(m => m.title)
+        };
+      });
 
-const contextStatus = selectedSubjectIds && selectedSubjectIds.length > 0
-    ? `FOCO ATIVO: O usuário selecionou especificamente as seguintes matérias: ${benchSubjects.map(s => s.title).join(", ")}. 
-       Dê prioridade total a esses assuntos e seus respectivos materiais.`
-    : "CONTEXTO AMPLO: O usuário está visualizando todas as matérias da bancada.";
+      const materialContents = benchMaterials
+        .filter(m => m.content)
+        .map(m => {
+          const subject = benchSubjects.find(s => s.id === m.subjectId);
+          return `--- MATERIAL: ${m.title} (${subject?.title || "Geral"}) ---\n${m.content}\n--- FIM DO MATERIAL ---`;
+        })
+        .join("\n\n");
 
-const systemPrompt = `Você é o PLANY, o parceiro de estudos definitivo e tutor de IA da plataforma.
+      const contextStatus = selectedSubjectIds && selectedSubjectIds.length > 0
+          ? `FOCO ATIVO: O usuário selecionou especificamente as seguintes matérias: ${benchSubjects.map(s => s.title).join(", ")}. 
+             Dê prioridade total a esses assuntos e seus respectivos materiais.`
+          : "CONTEXTO AMPLO: O usuário está visualizando todas as matérias da bancada.";
+
+      systemPrompt = `Você é o PLANY, o parceiro de estudos definitivo e tutor de IA da plataforma.
 Sua missão é guiar o usuário rumo à aprovação com foco total nos materiais que ele mesmo subiu.
 
 HOJE É: ${today.toLocaleDateString('pt-BR')}
@@ -140,6 +183,7 @@ ${materialContents || "Sem conteúdos específicos carregados para o contexto at
 4. **Citação Obrigatória:** Sempre cite o nome do material ao usar sua informação.
 
 Idioma: Português do Brasil.`;
+    }
 
     // 3. Formatar Mensagens (Garantindo que o Gemini entenda o histórico e o sistema)
     // O novo SDK @google/genai espera objetos estruturados
