@@ -13,6 +13,7 @@ import { Edit02Icon, Loading03Icon } from "@hugeicons/core-free-icons";
 import { getMaterialContent } from "@/lib/actions/fetch-bench";
 import Link from "next/link";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import ReactMarkdown from "react-markdown";
 
 interface ViewNoteDialogProps {
   materialId: string;
@@ -42,12 +43,14 @@ export function ViewNoteDialog({ materialId, title, open, onOpenChange }: ViewNo
       <DialogContent className="min-w-[70vw] max-w-6xl h-[80vh] flex flex-col p-0 gap-0 overflow-hidden">
         <DialogHeader className="px-6 py-4 border-b flex-row items-center justify-between space-y-0 shrink-0">
           <DialogTitle className="text-xl font-bold truncate pr-4">{title}</DialogTitle>
-          <Link href={`/dashboard/cadernos/${materialId}`} passHref>
-            <Button variant="default" size="sm" className="gap-2 shrink-0 mr-8">
-              <HugeiconsIcon icon={Edit02Icon} size={16} />
-              Ir para a anotação
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2 pr-6">
+            <Link href={`/dashboard/cadernos/${materialId}`} passHref>
+              <Button variant="default" size="sm" className="gap-2 shrink-0">
+                <HugeiconsIcon icon={Edit02Icon} size={16} />
+                Ir para a anotação
+              </Button>
+            </Link>
+          </div>
         </DialogHeader>
         <ScrollArea className="flex-1 p-6">
           {loading ? (
@@ -56,10 +59,9 @@ export function ViewNoteDialog({ materialId, title, open, onOpenChange }: ViewNo
               <span>Carregando anotação...</span>
             </div>
           ) : content ? (
-            <div 
-              className="prose prose-sm sm:prose-base dark:prose-invert max-w-none focus:outline-none"
-              dangerouslySetInnerHTML={{ __html: content }} 
-            />
+            <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none focus:outline-none">
+              <ReactMarkdown>{content}</ReactMarkdown>
+            </div>
           ) : (
             <div className="flex items-center justify-center h-full min-h-[200px] text-muted-foreground italic">
               Anotação vazia.
