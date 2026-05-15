@@ -29,11 +29,24 @@ O projeto utiliza um pipeline avançado para reduzir custos da API do Gemini em 
 
 ---
 
-## 3. Qualidade de Código (Backend & Frontend)
+## 3. Qualidade de Código & Actions Padronizadas (Services Layer)
+O PLANY utiliza uma camada de serviço centralizada para desacoplar a UI da lógica de banco de dados e garantir consistência em todo o ecossistema.
 
-- **Service Layer para IA:** A lógica de invocação do SDK (`@google/genai`) e a montagem de prompts longos não devem sujar as rotas (`app/api/chat/route.ts` deve apenas orquestrar). Idealmente, extraia para `lib/ai-optimizations.ts` ou arquivos em `services/`.
-- **Validação:** Retornos em JSON da IA devem ser validados antes de serem salvos no banco.
-- **Imutabilidade de Vetores:** Evite deletar vetores (`material_chunks`) levianamente se eles ainda forem úteis para o histórico de conhecimento.
+- **Centralização de Ações:** Nunca realize queries diretas (Drizzle) dentro de componentes. Toda lógica de dados deve residir em `lib/actions/` organizada por domínio (ex: `user-actions.ts`, `study-actions.ts`).
+- **Padrão de Resposta (ActionResponse):** Todas as Server Actions **DEVEM** seguir a interface padronizada:
+  ```typescript
+  type ActionResponse<T> = 
+    | { success: true; data: T; message: string }
+    | { success: false; data: null; message: string; error: string };
+  ```
+  - Utilize sempre os utilitários `actionSuccess(data, msg)` e `actionError(msg)`.
+- **Validação e Segurança:**
+  - **Zod:** Valide rigorosamente todos os inputs e outputs de ações usando Zod schemas.
+  - **Auth:** Verifique sempre a sessão (`auth.api.getSession`) e a propriedade do dado (`userId`) antes de qualquer consulta ou mutação.
+- **Sincronização & Revalidação:**
+  - Toda ação de escrita (mutação) deve disparar `revalidatePath` para as rotas afetadas. 
+  - Sempre inclua revalidação para rotas globais como `/dashboard` quando alterar dados que impactam contadores ou métricas gerais.
+- **Service Layer para IA:** A lógica de invocação do SDK (`@google/genai`) e a montagem de prompts não devem sujar as rotas. Extraia para `lib/ai-optimizations.ts` ou ações específicas.
 - **Tipagem Forte:** Explore ao máximo o TypeScript nos schemas do Drizzle (`lib/db/schema.ts`).
 
 ---

@@ -1,19 +1,20 @@
 'use server'
 
 import { db } from "@/lib/db";
-import { studyBenches, editalItems, materials, subjects, profiles, quizAttempts, quizzes } from "@/lib/db/schema";
-import { eq, inArray, sql } from "drizzle-orm";
+import { studyBenches, editalItems, materials, subjects, profiles, quizzes } from "@/lib/db/schema";
+import { eq, inArray } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { subDays, format, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { ActionResponse, actionError, actionSuccess } from "./types";
 
-export async function getDashboardData() {
+export async function getDashboardData(): Promise<ActionResponse<any>> {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
 
-  if (!session) return { success: false, error: "Unauthorized" };
+  if (!session) return actionError("Não autorizado");
 
   try {
     // 1. Get Profile
@@ -21,7 +22,7 @@ export async function getDashboardData() {
       where: eq(profiles.userId, session.user.id),
     });
 
-    if (!profile) return { success: false, error: "Profile not found" };
+    if (!profile) return actionError("Perfil não encontrado");
 
     // 2. Get Benches
     const benches = await db.query.studyBenches.findMany({
@@ -29,16 +30,13 @@ export async function getDashboardData() {
     });
 
     if (benches.length === 0) {
-      return { 
-        success: true, 
-        data: {
-          stats: { totalSubjects: 0, overallProgress: 0, totalMaterials: 0, studyStreak: 0 },
-          radarData: [],
-          activityData: [],
-          pendingSubjects: [],
-          isEmpty: true
-        } 
-      };
+      return actionSuccess({
+        stats: { totalSubjects: 0, overallProgress: 0, totalMaterials: 0, studyStreak: 0 },
+        radarData: [],
+        activityData: [],
+        pendingSubjects: [],
+        isEmpty: true
+      });
     }
 
     const benchIds = benches.map(b => b.id);
@@ -102,7 +100,6 @@ export async function getDashboardData() {
       const coveragePercent = stats.totalTopics > 0 ? (stats.coveredTopics / stats.totalTopics) * 100 : 0;
       const quizPercent = stats.quizCount > 0 ? (stats.totalQuizScore / stats.quizCount) : 0;
       
-      // If we have quiz data, weight it (e.g., 60% coverage, 40% quiz)
       const finalProgress = stats.quizCount > 0 
         ? Math.round((coveragePercent * 0.6) + (quizPercent * 0.4))
         : Math.round(coveragePercent);
@@ -146,24 +143,21 @@ export async function getDashboardData() {
       .sort((a, b) => a.progress - b.progress)
       .slice(0, 5);
 
-    return {
-      success: true,
-      data: {
-        stats: {
-          totalSubjects,
-          overallProgress,
-          totalMaterials: totalMaterialsCount,
-          studyStreak: streak,
-          totalBenches: benches.length,
-        },
-        radarData,
-        activityData: last7Days,
-        pendingSubjects,
-        isEmpty: false
-      }
-    };
+    return actionSuccess({
+      stats: {
+        totalSubjects,
+        overallProgress,
+        totalMaterials: totalMaterialsCount,
+        studyStreak: streak,
+        totalBenches: benches.length,
+      },
+      radarData,
+      activityData: last7Days,
+      pendingSubjects,
+      isEmpty: false
+    });
   } catch (error) {
     console.error("Error fetching dashboard data:", error);
-    return { success: false, error: "Failed to fetch dashboard data" };
+    return actionError("Erro ao recuperar dados do dashboard");
   }
 }

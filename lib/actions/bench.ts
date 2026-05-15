@@ -246,7 +246,7 @@ export async function deleteStudyBench(benchId: string) {
   }
 }
 
-export async function addMaterial(formData: FormData) {
+export async function addMaterial(formData: FormData): Promise<ActionResponse<{ materialId: string }>> {
   const benchId = formData.get("benchId") as string;
   let subjectId = formData.get("subjectId") as string | null;
   const editalItemId = formData.get("editalItemId") as string | null;
@@ -258,7 +258,7 @@ export async function addMaterial(formData: FormData) {
   const isPinned = formData.get("isPinned") === "true";
 
   if (!benchId || !title || !type) {
-    return { success: false, error: "Informações incompletas" };
+    return actionError("Informações incompletas");
   }
 
   try {
@@ -329,11 +329,8 @@ export async function addMaterial(formData: FormData) {
     }).returning();
 
     // STEP: Surgical RAG - Chunking and Vectorization
-    // Garante que qualquer material com conteúdo seja fatiado e vetorizado
     if (content && content.trim().length > 0) {
       const chunks = chunkMarkdown(content);
-      console.log(`Fatiando material ${material.id}: ${chunks.length} chunks encontrados.`);
-      
       for (const chunk of chunks) {
         try {
           const embedding = await getEmbedding(chunk);
@@ -349,10 +346,11 @@ export async function addMaterial(formData: FormData) {
     }
 
     revalidatePath(`/dashboard/bancadas/${benchId}`);
-    return { success: true, materialId: material.id };
+    revalidatePath("/dashboard");
+    return actionSuccess({ materialId: material.id }, "Material adicionado com sucesso");
   } catch (error: any) {
     console.error("Erro ao adicionar material:", error);
-    return { success: false, error: error.message };
+    return actionError(error.message || "Erro ao adicionar material");
   }
 }
 
@@ -374,7 +372,7 @@ export async function createTopic(data: { benchId: string; category: string; top
   }
 }
 
-export async function createSubject(data: { benchId: string; title: string; colorTag: string; icon?: string; priority?: number }) {
+export async function createSubject(data: { benchId: string; title: string; colorTag: string; icon?: string; priority?: number }): Promise<ActionResponse<any>> {
   try {
     const [subject] = await db.insert(subjects).values({
       benchId: data.benchId,
@@ -385,14 +383,15 @@ export async function createSubject(data: { benchId: string; title: string; colo
     }).returning();
 
     revalidatePath(`/dashboard/bancadas/${data.benchId}`);
-    return { success: true, subject };
+    revalidatePath("/dashboard");
+    return actionSuccess(subject, "Disciplina criada com sucesso");
   } catch (error: any) {
     console.error("Erro ao criar disciplina:", error);
-    return { success: false, error: error.message };
+    return actionError(error.message || "Erro ao criar disciplina");
   }
 }
 
-export async function updateSubject(subjectId: string, data: { title?: string; colorTag?: string; icon?: string; priority?: number }) {
+export async function updateSubject(subjectId: string, data: { title?: string; colorTag?: string; icon?: string; priority?: number }): Promise<ActionResponse<any>> {
   try {
     const [subject] = await db.update(subjects)
       .set(data)
@@ -400,30 +399,36 @@ export async function updateSubject(subjectId: string, data: { title?: string; c
       .returning();
 
     revalidatePath(`/dashboard/bancadas/${subject.benchId}`);
-    return { success: true, subject };
+    revalidatePath("/dashboard");
+    return actionSuccess(subject, "Disciplina atualizada com sucesso");
   } catch (error: any) {
     console.error("Erro ao atualizar disciplina:", error);
-    return { success: false, error: error.message };
+    return actionError(error.message || "Erro ao atualizar disciplina");
   }
 }
 
-export async function deleteSubject(subjectId: string) {
+import { ActionResponse, actionError, actionSuccess, IdSchema } from "./types";
+
+export async function deleteSubject(subjectId: string): Promise<ActionResponse<null>> {
+  const validation = IdSchema.safeParse(subjectId);
+  if (!validation.success) return actionError("ID inválido");
+
   try {
     const [subject] = await db.select().from(subjects).where(eq(subjects.id, subjectId));
-    if (!subject) throw new Error("Disciplina não encontrada");
+    if (!subject) return actionError("Disciplina não encontrada");
 
     await db.transaction(async (tx) => {
-      // Set subjectId to null for materials instead of deleting them, or delete them?
-      // The user said "Excluir (com confirmação)", let's delete for now as per hierarchical management.
       await tx.delete(materials).where(eq(materials.subjectId, subjectId));
       await tx.delete(subjects).where(eq(subjects.id, subjectId));
     });
 
     revalidatePath(`/dashboard/bancadas/${subject.benchId}`);
-    return { success: true };
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/cadernos");
+    return actionSuccess(null, "Disciplina excluída com sucesso");
   } catch (error: any) {
     console.error("Erro ao excluir disciplina:", error);
-    return { success: false, error: error.message };
+    return actionError(error.message || "Erro ao excluir disciplina");
   }
 }
 
@@ -464,6 +469,8 @@ export async function deleteMaterial(materialId: string) {
       .returning();
 
     revalidatePath(`/dashboard/bancadas/${material.benchId}`);
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/cadernos");
     return { success: true };
   } catch (error: any) {
     console.error("Erro ao excluir material:", error);
@@ -479,6 +486,7 @@ export async function toggleTopicCompletion(itemId: string, isCovered: boolean) 
       .returning();
 
     revalidatePath(`/dashboard/bancadas/${item.benchId}`);
+    revalidatePath("/dashboard");
     return { success: true, isCovered: item.isCovered };
   } catch (error: any) {
     console.error("Erro ao alternar conclusão do tópico:", error);
