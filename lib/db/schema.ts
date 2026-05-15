@@ -218,13 +218,42 @@ export const quizAttempts = pgTable("quiz_attempts", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// --- Flashcards System ---
+
+export const flashcards = pgTable("flashcards", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  benchId: uuid("bench_id")
+    .notNull()
+    .references(() => studyBenches.id, { onDelete: "cascade" }),
+  subjectId: uuid("subject_id")
+    .notNull()
+    .references(() => subjects.id, { onDelete: "cascade" }),
+  front: text("front").notNull(), // Pergunta ou conceito
+  back: text("back").notNull(), // Resposta ou explicação
+  easeFactor: text("ease_factor").default("2.5").notNull(), // SM-2 Algorithm
+  interval: integer("interval").default(0).notNull(), // Em dias
+  repetitions: integer("repetitions").default(0).notNull(),
+  nextReviewAt: timestamp("next_review_at").defaultNow().notNull(),
+  lastReviewedAt: timestamp("last_reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const flashcardAttempts = pgTable("flashcard_attempts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  flashcardId: uuid("flashcard_id")
+    .notNull()
+    .references(() => flashcards.id, { onDelete: "cascade" }),
+  performance: integer("performance").notNull(), // 0-5 (0: Esqueci, 5: Fácil)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const materialChunks = pgTable("material_chunks", {
   id: uuid("id").primaryKey().defaultRandom(),
   materialId: uuid("material_id")
     .notNull()
     .references(() => materials.id, { onDelete: "cascade" }),
   content: text("content").notNull(),
-  embedding: vector("embedding", { dimensions: 1536 }),
+  embedding: vector("embedding", { dimensions: 3072 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => {
   return {
@@ -238,7 +267,7 @@ export const semanticCache = pgTable("semantic_cache", {
     .notNull()
     .references(() => studyBenches.id, { onDelete: "cascade" }),
   query: text("query").notNull(),
-  queryEmbedding: vector("query_embedding", { dimensions: 1536 }),
+  queryEmbedding: vector("query_embedding", { dimensions: 3072 }),
   response: text("response").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => {

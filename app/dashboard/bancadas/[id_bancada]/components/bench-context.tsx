@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-export type SidebarState = 'default' | 'quiz_list' | 'active_quiz' | 'quiz_config';
+export type SidebarState = 'default' | 'quiz_list' | 'active_quiz' | 'quiz_config' | 'flashcard_list' | 'flashcard_study' | 'flashcard_config';
 
 interface BenchContextType {
   selectedContextSubjects: string[];
@@ -21,8 +21,12 @@ interface BenchContextType {
   setSidebarState: (state: SidebarState) => void;
   activeQuizId: string | null;
   setActiveQuizId: (id: string | null) => void;
+  activeFlashcardSubjectId: string | null;
+  setActiveFlashcardSubjectId: (id: string | null) => void;
   isGeneratingQuiz: boolean;
   setIsGeneratingQuiz: (is: boolean) => void;
+  isGeneratingFlashcards: boolean;
+  setIsGeneratingFlashcards: (is: boolean) => void;
   isEditalConsultantMode: boolean;
   setIsEditalConsultantMode: (is: boolean) => void;
   externalMessage: string | null;
@@ -68,7 +72,9 @@ export function BenchProvider({
   // Sidebar State
   const [sidebarState, setSidebarState] = useState<SidebarState>('default');
   const [activeQuizId, setActiveQuizId] = useState<string | null>(null);
+  const [activeFlashcardSubjectId, setActiveFlashcardSubjectId] = useState<string | null>(null);
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
+  const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
   const [isEditalConsultantMode, setIsEditalConsultantMode] = useState(false);
   const [externalMessage, setExternalMessage] = useState<string | null>(null);
 
@@ -155,8 +161,12 @@ export function BenchProvider({
       setSidebarState,
       activeQuizId,
       setActiveQuizId,
+      activeFlashcardSubjectId,
+      setActiveFlashcardSubjectId,
       isGeneratingQuiz,
       setIsGeneratingQuiz,
+      isGeneratingFlashcards,
+      setIsGeneratingFlashcards,
       isEditalConsultantMode,
       setIsEditalConsultantMode,
       externalMessage,

@@ -13,6 +13,8 @@ import {
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { GoogleGenAI } from "@google/genai";
+import { getEmbedding } from "@/lib/ai-optimizations";
+import { materialChunks } from "@/lib/db/schema";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const ai = new GoogleGenAI({ apiKey: apiKey || "" });
@@ -23,36 +25,43 @@ export async function generateQuizAction(
   selectedEditalItemIds: string[]
 ) {
   try {
-    // 1. Get Context: Fetch materials from selected subjects/edital items
-    const contextMaterials = await db.query.materials.findMany({
-      where: and(
-        eq(materials.benchId, benchId),
-        inArray(materials.editalItemId, selectedEditalItemIds)
-      ),
-    });
-
-    if (contextMaterials.length === 0) {
-      // Fallback: If no materials for specific edital items, get all materials for the subject
-      const subjectMaterials = await db.query.materials.findMany({
-        where: and(
-          eq(materials.benchId, benchId),
-          eq(materials.subjectId, subjectId)
-        ),
-      });
-      
-      if (subjectMaterials.length > 0) {
-        contextMaterials.push(...subjectMaterials);
-      }
-    }
-
-    const contextText = contextMaterials
-      .map(m => `--- ${m.title} ---\n${m.content}`)
-      .join("\n\n")
-      .substring(0, 30000); // Limit context size
-
+    // 1. Get Context: Using Surgical RAG
     const subject = await db.query.subjects.findFirst({
       where: eq(subjects.id, subjectId)
     });
+
+    const editalItemsList = await db.query.editalItems.findMany({
+      where: inArray(editalItems.id, selectedEditalItemIds)
+    });
+
+    const searchQueries = editalItemsList.map(item => item.topic).join(", ") || subject?.title || "Geral";
+    const queryEmbedding = await getEmbedding(searchQueries);
+
+    // Retrieval: Get Top 15 relevant chunks
+    const relevantChunks = await db
+      .select({
+        content: materialChunks.content,
+      })
+      .from(materialChunks)
+      .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+      .where(
+        and(
+          eq(materials.benchId, benchId),
+          selectedEditalItemIds.length > 0 
+            ? inArray(materials.editalItemId, selectedEditalItemIds)
+            : eq(materials.subjectId, subjectId)
+        )
+      )
+      .orderBy(t => desc(sql`1 - (${materialChunks.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector)`))
+      .limit(15);
+
+    const contextText = relevantChunks
+      .map(c => c.content)
+      .join("\n\n");
+
+    if (!contextText) {
+      throw new Error("Não encontramos materiais suficientes indexados para gerar este simulado. Tente subir mais PDFs ou aguarde a vetorização.");
+    }
 
     // 2. Prompt AI for Quiz Generation
     const systemPrompt = `Você é um Analista de Provas e Concursos da Kyper Agência.

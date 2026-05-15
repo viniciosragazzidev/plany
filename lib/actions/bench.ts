@@ -329,8 +329,11 @@ export async function addMaterial(formData: FormData) {
     }).returning();
 
     // STEP: Surgical RAG - Chunking and Vectorization
-    if (content) {
+    // Garante que qualquer material com conteúdo seja fatiado e vetorizado
+    if (content && content.trim().length > 0) {
       const chunks = chunkMarkdown(content);
+      console.log(`Fatiando material ${material.id}: ${chunks.length} chunks encontrados.`);
+      
       for (const chunk of chunks) {
         try {
           const embedding = await getEmbedding(chunk);
@@ -811,7 +814,7 @@ export async function importWebMaterials(webSourceIds: string[]) {
           .where(eq(webSources.id, source.id as any));
 
         importedMaterials.push({
-          id: material[0]?.id,
+          id: material.id,
           title: source.title,
           source: source.sourceUrl,
         });

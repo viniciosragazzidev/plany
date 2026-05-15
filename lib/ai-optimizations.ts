@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 const apiKey = process.env.GEMINI_API_KEY;
+// Instancia o cliente oficial do novo SDK do Gemini
 const ai = new GoogleGenAI({ apiKey: apiKey || "" });
 
 /**
@@ -9,11 +10,11 @@ const ai = new GoogleGenAI({ apiKey: apiKey || "" });
 export async function getEmbedding(text: string): Promise<number[]> {
   try {
     const response = await ai.models.embedContent({
-      model: "text-embedding-004",
-      contents: [text],
+      model: "gemini-embedding-001",
+      contents: text, 
     });
     
-    // O SDK novo retorna um array em response.embeddings
+    // CORREÇÃO: O SDK oficial @google/genai retorna um array dentro de 'embeddings'
     const values = response.embeddings?.[0]?.values;
     if (!values) throw new Error("Falha ao obter embeddings do Gemini");
     
@@ -24,10 +25,6 @@ export async function getEmbedding(text: string): Promise<number[]> {
   }
 }
 
-/**
- * Implementação das funções core de Preservação de Tokens
- * Seguindo o plano em .gemini/bestpratices/token_preservation_plan.md
- */
 
 /**
  * Divide o conteúdo Markdown em chunks que respeitam a estrutura de parágrafos e cabeçalhos.
@@ -41,7 +38,7 @@ export function chunkMarkdown(content: string, maxChunkSize = 1000): string[] {
   let currentChunk = "";
 
   for (const paragraph of paragraphs) {
-    // Se um único parágrafo for maior que o limite, precisamos quebrá-lo também
+    // CORREÇÃO/MELHORIA: Garante que parágrafos gigantes isolados sejam fatiados com segurança
     if (paragraph.length > maxChunkSize) {
       if (currentChunk !== "") {
         chunks.push(currentChunk.trim());
@@ -85,5 +82,6 @@ export function calculateSimulatedSimilarity(vecA: number[], vecB: number[]): nu
     normA += vecA[i] * vecA[i];
     normB += vecB[i] * vecB[i];
   }
+  if (normA === 0 || normB === 0) return 0; // Proteção contra divisão por zero
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }

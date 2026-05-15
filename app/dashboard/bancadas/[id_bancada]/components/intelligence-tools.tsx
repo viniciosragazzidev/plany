@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { QuizActiveState } from "./quiz-active-state";
+import { FlashcardsTool } from "./flashcards-tool";
 
 interface IntelligenceToolsProps {
   targetDate: string;
@@ -48,6 +49,7 @@ export function IntelligenceTools({ targetDate, weeklyHours, benchId, editalItem
     setActiveQuizId, 
     isGeneratingQuiz, 
     setIsGeneratingQuiz,
+    isGeneratingFlashcards,
     isEditalConsultantMode,
     setIsEditalConsultantMode
   } = useBench();
@@ -148,6 +150,10 @@ export function IntelligenceTools({ targetDate, weeklyHours, benchId, editalItem
 
   if (sidebarState === 'active_quiz' && activeQuizId) {
     return <QuizActiveState quizId={activeQuizId} onBack={() => setSidebarState('quiz_list')} />;
+  }
+
+  if (sidebarState === 'flashcard_list' || sidebarState === 'flashcard_study' || sidebarState === 'flashcard_config') {
+    return <FlashcardsTool benchId={benchId} subjects={subjects as any} />;
   }
 
   if (sidebarState === 'quiz_list') {
@@ -416,9 +422,22 @@ export function IntelligenceTools({ targetDate, weeklyHours, benchId, editalItem
                 {isGeneratingQuiz ? "Gerando..." : "Simulados"}
               </span>
             </Button>
-            <Button variant="outline" className="h-auto py-4 flex-col gap-2 rounded-2xl bg-background border-border/50 hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-amber-500/5">
-              <HugeiconsIcon icon={FlashIcon} size={20} className="text-amber-500" />
-              <span className="text-[10px] font-bold uppercase tracking-tight">Flashcards</span>
+            <Button 
+              variant="outline" 
+              className={cn(
+                "h-auto py-4 flex-col gap-2 rounded-2xl bg-background border-border/50 hover:border-amber-500/50 transition-all hover:shadow-lg hover:shadow-amber-500/5",
+                isGeneratingFlashcards && "border-amber-500/50 bg-amber-500/5 shadow-lg shadow-amber-500/5"
+              )}
+              onClick={() => setSidebarState('flashcard_list')}
+            >
+              {isGeneratingFlashcards ? (
+                <div className="w-5 h-5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+              ) : (
+                <HugeiconsIcon icon={FlashIcon} size={20} className="text-amber-500" />
+              )}
+              <span className="text-[10px] font-bold uppercase tracking-tight">
+                {isGeneratingFlashcards ? "Gerando..." : "Flashcards"}
+              </span>
             </Button>
             <Button variant="outline" className="h-auto py-4 flex-col gap-2 rounded-2xl bg-background border-border/50 hover:border-primary/50 transition-all col-span-2 hover:shadow-lg hover:shadow-emerald-500/5">
               <HugeiconsIcon icon={BrainIcon} size={20} className="text-emerald-500" />
