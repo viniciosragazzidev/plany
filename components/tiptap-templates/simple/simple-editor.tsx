@@ -232,10 +232,8 @@ export function SimpleEditor({ initialContent, onChange }: SimpleEditorProps) {
         onError: (error) => console.error("Upload failed:", error),
       }),
       Markdown.configure({
-        html: true,
         tightLists: true,
         bulletListMarker: '-',
-        linkify: true,
         breaks: true,
         transformPastedText: true,
         transformCopiedText: true,
