@@ -1,4 +1,5 @@
 import { pgTable, text, integer, timestamp, boolean, uuid, pgEnum, date, index, vector } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 
 export const user = pgTable("user", {
 	id: text("id").primaryKey(),
@@ -275,3 +276,35 @@ export const semanticCache = pgTable("semantic_cache", {
     queryEmbeddingIndex: index("queryEmbeddingIndex").using("hnsw", table.queryEmbedding.op("vector_cosine_ops")),
   };
 });
+
+// --- RELATIONS ---
+
+export const studyBenchesRelations = relations(studyBenches, ({ many, one }) => ({
+  profile: one(profiles, {
+    fields: [studyBenches.profileId],
+    references: [profiles.id],
+  }),
+  subjects: many(subjects),
+  materials: many(materials),
+  editalItems: many(editalItems),
+}));
+
+export const subjectsRelations = relations(subjects, ({ one, many }) => ({
+  bench: one(studyBenches, {
+    fields: [subjects.benchId],
+    references: [studyBenches.id],
+  }),
+  materials: many(materials),
+}));
+
+export const materialsRelations = relations(materials, ({ one, many }) => ({
+  bench: one(studyBenches, {
+    fields: [materials.benchId],
+    references: [studyBenches.id],
+  }),
+  subject: one(subjects, {
+    fields: [materials.subjectId],
+    references: [subjects.id],
+  }),
+  chunks: many(materialChunks),
+}));

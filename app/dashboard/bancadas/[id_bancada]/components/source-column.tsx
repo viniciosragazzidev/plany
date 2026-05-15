@@ -42,6 +42,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { CoverageRing } from "@/components/ui/coverage-ring";
 import { Tick01Icon } from "@hugeicons/core-free-icons";
+import { ViewNoteDialog } from "./view-note-dialog";
 
 import { useBenchData } from "@/hooks/use-bench-data";
 
@@ -370,6 +371,7 @@ function MaterialItem({ material, onDelete, onTogglePin }: {
   onTogglePin: () => void;
 }) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = React.useState(false);
   const isNew = material.createdAt && (new Date().getTime() - new Date(material.createdAt).getTime() < 1000 * 60 * 5);
   const isOptimistic = (material as any).isOptimistic;
 
@@ -384,56 +386,81 @@ function MaterialItem({ material, onDelete, onTogglePin }: {
     toast.success(material.isPinned ? "Material removido do topo" : "Material fixado no topo!");
   };
 
-  return (
-    <div className={cn(
-      "group flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-background transition-all cursor-pointer relative",
-      (isNew || isOptimistic) && "border border-primary/20 bg-primary/5"
-    )}>
-      <div className={cn(
-        "size-1.5 rounded-full shrink-0 transition-colors",
-        isOptimistic ? "bg-primary animate-pulse" : isNew ? "bg-primary animate-ping" : "bg-border/50"
-      )} />
-      <span className={cn(
-        "text-xs font-medium truncate flex-1 group-hover:text-primary transition-colors",
-        isOptimistic && "text-muted-foreground italic"
-      )}>
-        {material.title}
-        {isOptimistic && " (Sincronizando...)"}
-      </span>
-      {material.isPinned && <HugeiconsIcon icon={PinIcon} size={10} className="text-primary" />}
-      
-      {!isOptimistic && (
-        <DropdownMenu>
-          <DropdownMenuTrigger render={
-            <Button variant="ghost" size="icon-xs" className="opacity-0 group-hover:opacity-100 h-5 w-5 rounded-md transition-opacity">
-              <HugeiconsIcon icon={MoreHorizontalIcon} size={12} />
-            </Button>
-          } />
-          <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem className="gap-2" onClick={handleTogglePin}>
-              <HugeiconsIcon icon={material.isPinned ? PinOffIcon : PinIcon} size={14} />
-              {material.isPinned ? "Desafixar" : "Fixar no topo"}
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              className="gap-2 text-destructive" 
-              onClick={() => setIsDeleteDialogOpen(true)}
-            >
-              <HugeiconsIcon icon={Delete02Icon} size={14} />
-              Excluir
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
+  const handleClick = (e: React.MouseEvent) => {
+    if (material.type === "anotacao" && !isOptimistic) {
+      setIsViewDialogOpen(true);
+    }
+  };
 
-      <ConfirmDialog
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-        title="Excluir Material?"
-        description="Tem certeza que deseja excluir este material? Esta ação não pode ser desfeita."
-        onConfirm={handleDelete}
-        variant="destructive"
-      />
-    </div>
+  return (
+    <>
+      <div 
+        onClick={handleClick}
+        className={cn(
+          "group flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-background transition-all cursor-pointer relative",
+          (isNew || isOptimistic) && "border border-primary/20 bg-primary/5"
+        )}
+      >
+        <div className={cn(
+          "size-1.5 rounded-full shrink-0 transition-colors",
+          isOptimistic ? "bg-primary animate-pulse" : isNew ? "bg-primary animate-ping" : "bg-border/50"
+        )} />
+        <span className={cn(
+          "text-xs font-medium truncate flex-1 group-hover:text-primary transition-colors",
+          isOptimistic && "text-muted-foreground italic"
+        )}>
+          {material.title}
+          {isOptimistic && " (Sincronizando...)"}
+        </span>
+        {material.isPinned && <HugeiconsIcon icon={PinIcon} size={10} className="text-primary" />}
+        
+        {!isOptimistic && (
+          <DropdownMenu>
+            <DropdownMenuTrigger render={
+              <Button 
+                variant="ghost" 
+                size="icon-xs" 
+                className="opacity-0 group-hover:opacity-100 h-5 w-5 rounded-md transition-opacity"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <HugeiconsIcon icon={MoreHorizontalIcon} size={12} />
+              </Button>
+            } />
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); handleTogglePin(); }}>
+                <HugeiconsIcon icon={material.isPinned ? PinOffIcon : PinIcon} size={14} />
+                {material.isPinned ? "Desafixar" : "Fixar no topo"}
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                className="gap-2 text-destructive" 
+                onClick={(e) => { e.stopPropagation(); setIsDeleteDialogOpen(true); }}
+              >
+                <HugeiconsIcon icon={Delete02Icon} size={14} />
+                Excluir
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        <ConfirmDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          title="Excluir Material?"
+          description="Tem certeza que deseja excluir este material? Esta ação não pode ser desfeita."
+          onConfirm={handleDelete}
+          variant="destructive"
+        />
+      </div>
+
+      {material.type === "anotacao" && (
+        <ViewNoteDialog
+          materialId={material.id}
+          title={material.title}
+          open={isViewDialogOpen}
+          onOpenChange={setIsViewDialogOpen}
+        />
+      )}
+    </>
   );
 }
 

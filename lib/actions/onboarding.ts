@@ -84,6 +84,7 @@ export async function completeOnboarding(data: {
     
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/bancadas");
+    revalidatePath("/dashboard/cadernos");
   } catch (error) {
     console.error("Erro no onboarding:", error);
     return { error: "Falha ao salvar os dados. Tente novamente." };
@@ -112,7 +113,7 @@ export async function createStudyBench(data: {
   const userId = session.user.id;
 
   try {
-    await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       // 1. Buscar Perfil
       const profile = await tx.query.profiles.findFirst({
         where: eq(profiles.userId, userId),
@@ -134,15 +135,16 @@ export async function createStudyBench(data: {
         .returning();
 
       // 3. Criar Disciplinas
+      let createdSubjects: any[] = [];
       if (data.subjects.length > 0) {
-        await tx.insert(subjects).values(
+        createdSubjects = await tx.insert(subjects).values(
           data.subjects.map((s) => ({
             benchId: bench.id,
             title: s.title,
             priority: s.priority,
             colorTag: s.colorTag,
           }))
-        );
+        ).returning();
       }
 
       // 4. Criar Itens do Edital
@@ -157,14 +159,16 @@ export async function createStudyBench(data: {
           }))
         );
       }
+
+      return { bench, subjects: createdSubjects };
     });
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/bancadas");
+    revalidatePath("/dashboard/cadernos");
+    return { success: true, data: result };
   } catch (error) {
     console.error("Erro ao criar bancada:", error);
     return { error: "Falha ao criar a bancada. Tente novamente." };
   }
-
-  return { success: true };
 }

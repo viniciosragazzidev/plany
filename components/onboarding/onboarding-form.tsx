@@ -33,6 +33,7 @@ import { extractBenchDataFromEdital } from "@/lib/actions/bench";
 import { Logo } from "@/components/ui/logo";
 import { parseISO, isValid, parse } from "date-fns";
 import { FileAttachmentIcon, Loading03Icon, SparklesIcon } from "@hugeicons/core-free-icons";
+import { useCadernos } from "@/hooks/use-cadernos";
 
 type Step = 1 | 2 | 3;
 
@@ -47,6 +48,7 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
   const [isPending, setIsPending] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const addBenchLocal = useCadernos((state) => state.addBenchLocal);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -181,7 +183,14 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
 
         if (result?.error) {
           toast.error(result.error);
-        } else {
+        } else if (result.success && result.data) {
+          // Update local state for instant feedback
+          addBenchLocal({
+            id: result.data.bench.id,
+            goalName: result.data.bench.goalName,
+            subjects: result.data.subjects,
+          });
+
           toast.success("Nova bancada criada com sucesso!");
           onSuccess?.();
           router.refresh();

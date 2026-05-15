@@ -1,5 +1,5 @@
 'use client'
-import { Calendar, CheckCircle, DashboardBrowsingIcon, Folder, Pencil, Settings } from "@hugeicons/core-free-icons";
+import { Calendar, CheckCircle, DashboardBrowsingIcon, Folder, Pencil, Settings, Note01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -26,9 +26,9 @@ export default function SidebarItems({ closeOnSelect = false }: { closeOnSelect?
             href: "/dashboard/tasks"
         },
         {
-            name: "Anotações",
-            icon: Calendar,
-            href: "/dashboard/calendar"
+            name: "Cadernos",
+            icon: Note01Icon,
+            href: "/dashboard/cadernos"
         },
         {
             name: "Configurações",

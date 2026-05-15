@@ -31,3 +31,14 @@ export async function getBenchMaterials(benchId: string) {
     .from(materials)
     .where(eq(materials.benchId, benchId));
 }
+
+export async function getMaterialContent(materialId: string) {
+  const result = await db
+    .select({ content: materials.content })
+    .from(materials)
+    .where(eq(materials.id, materialId))
+    .limit(1);
+    
+  return result[0]?.content || null;
+}
+
