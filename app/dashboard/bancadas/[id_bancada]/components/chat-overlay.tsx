@@ -16,7 +16,7 @@ export function ChatOverlay() {
     <>
       {/* Floating Trigger Button */}
       {!isOpen && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-60 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <Button 
             onClick={(e) => {
               e.stopPropagation();
@@ -34,20 +34,24 @@ export function ChatOverlay() {
 
       {/* Chat Container Overlay */}
       <div className={cn(
-        "fixed inset-0 transition-all duration-500 ease-in-out flex items-end justify-center pb-8 px-4 md:px-0",
-        isOpen ? "opacity-100 pointer-events-auto z-50 translate-y-0" : "opacity-0 pointer-events-none z-0 translate-y-12"
+        "fixed inset-0 transition-all duration-500 ease-in-out flex justify-center px-4 md:px-0",
+        isOpen ? "opacity-100 pointer-events-auto z-50 translate-y-0" : "opacity-0 pointer-events-none z-0 translate-y-12",
+        isOpen && isMaximized ? "items-start pt-8 pb-0" : "items-end pb-8"
       )}>
         {/* Backdrop for Maximized Mode */}
         <div className={cn(
-            "absolute inset-0 bg-background/80 backdrop-blur-sm transition-opacity duration-700",
-            isOpen && isMaximized ? "opacity-100" : "opacity-0"
+            "absolute inset-0 bg-background/80 backdrop-blur-md transition-all duration-700",
+            isOpen && isMaximized ? "opacity-100 visible" : "opacity-0 invisible"
         )} />
 
         <div className={cn(
-          "w-full bg-background transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) pointer-events-auto origin-bottom relative",
-          isOpen ? "translate-y-0 scale-100 rotate-0 opacity-100" : "translate-y-20 scale-95 rotate-1 opacity-0",
+          "w-full bg-background transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) pointer-events-auto origin-bottom relative",
+          isOpen 
+            ? "translate-y-0 scale-100 rotate-0 opacity-100 animate-in fade-in slide-in-from-bottom-4"
+            : "translate-y-20 scale-95 rotate-1 opacity-0",
+          isMaximized && isOpen ? "translate-y-5" : "",
           isMaximized 
-            ? "h-[100dvh] w-full max-w-none pb-0 rounded-none shadow-none border-0" 
+            ? "h-[calc(100dvh-40px)] w-[calc(100vw-40px)] max-w-7xl mb-5 rounded-3xl shadow-2xl border border-border/50" 
             : "h-[80vh] max-w-4xl rounded-3xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] border border-border/50"
         )}>
            <ChatBench />

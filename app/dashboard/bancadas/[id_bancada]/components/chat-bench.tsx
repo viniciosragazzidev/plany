@@ -156,8 +156,8 @@ export function ChatBench() {
     )}>
       {/* Chat Header */}
       <div className={cn(
-        "p-6 border-b border-border/50 flex justify-between items-center bg-background/50 backdrop-blur-md sticky top-0 z-10 transition-all duration-500 ease-in-out",
-        isOpen ? "translate-y-0 opacity-100" : "-translate-y-8 opacity-0"
+        "p-6 border-b border-border/50 flex  justify-between items-center bg-background/50 transform backdrop-blur-md sticky top-0 z-10 transition-all duration-500 ease-in-out",
+        isOpen ? "translate-y-5 opacity-100 " : "-translate-y-8 opacity-0"
       )}>
         <div className="flex items-center gap-3 group">
           <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform duration-300">
@@ -195,7 +195,7 @@ export function ChatBench() {
 
       {/* Messages Area */}
       <div className={cn(
-        "flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-secondary transition-all duration-500",
+        "flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-secondary transform transition-all duration-500",
         isOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
       )}>
         {messages.map((msg, i) => {
@@ -285,7 +285,7 @@ export function ChatBench() {
 
       {/* Input Area */}
       <div className={cn(
-        "p-6 bg-gradient-to-t from-background via-background to-transparent pt-10 transition-all duration-500 ease-out",
+        "p-6 bg-gradient-to-t from-background via-background to-transparent transform  pt-10 transition-all duration-500 ease-out",
         isOpen ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
       )}>
         <div className="max-w-3xl mx-auto w-full space-y-4">

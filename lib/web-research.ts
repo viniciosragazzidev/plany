@@ -14,6 +14,79 @@ export interface QueryGenOutput {
   queries: string[];
 }
 
+export async function researchEmptyEditalTopics(editalContent: string, webContext?: string): Promise<string[]> {
+  const systemPrompt = `Você é um Assistente Especialista em Concursos Públicos e Pesquisa Acadêmica.
+O usuário importou um edital (ou parte dele) que NÃO possui o conteúdo programático definido.
+
+Sua tarefa ocorre em DUAS FASES:
+Fase 1: Reunir Nome do Concurso, Ano, Data da Prova e Matérias baseando-se no texto fornecido ${webContext ? "E nas informações pesquisadas na web" : ""}.
+Fase 2: Atuar como um "Garimpo" (Pesquisador). Para o concurso identificado e as matérias encontradas, VOCÊ DEVE ESTIPULAR/PESQUISAR na sua base de conhecimento qual é o CONTEÚDO PROGRAMÁTICO PADRÃO E ESPERADO. 
+
+${webContext ? `CONTEXTO PESQUISADO NA WEB (Use isso como fonte prioritária):\n${webContext}\n` : ""}
+
+Retorne APENAS um JSON válido contendo uma lista consolidada de tópicos no formato "Matéria: Nome do Tópico".
+Exemplo de formato:
+{
+  "topics": [
+    "Língua Portuguesa: Compreensão e interpretação de textos",
+    "Direito Administrativo: Atos Administrativos",
+    "Informática: Segurança da Informação"
+  ]
+}`;
+
+  const userPrompt = `Texto do Edital Importado:\n\n${editalContent.substring(0, 5000)}\n\nExtraia os dados (Concurso, Ano, Data, Materias) e, em seguida, liste os conteúdos programáticos para essas matérias. Retorne apenas o JSON com o array 'topics'.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      config: {
+        systemInstruction: {
+          parts: [{ text: systemPrompt }],
+        },
+      },
+    });
+
+    const text = response.text;
+    if (!text) return [];
+
+    const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(jsonStr);
+    return parsed.topics || [];
+  } catch (error) {
+    console.error("Erro ao pesquisar tópicos do edital vazio:", error);
+    return [];
+  }
+}
+
+/**
+ * Embeleza o título de um material encontrado na web para torná-lo mais acadêmico e legível.
+ */
+export async function beautifyMaterialTitle(rawTitle: string, topic: string): Promise<string> {
+  try {
+    const model = ai.models.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const prompt = `Você é um Curador de Conteúdo Acadêmico. 
+Sua tarefa é limpar e transformar um título de arquivo/página web em um título elegante, profissional e direto para um material de estudo.
+
+Tópico do Assunto: ${topic}
+Título Bruto: ${rawTitle}
+
+Regras:
+- Remova extensões como .pdf, .docx, .html
+- Remova códigos aleatórios, hashes ou sufixos de sistema (ex: ads_123, kakfna...)
+- Capitalize corretamente (Iniciais em Maiúsculo)
+- Mantenha o título curto e focado no conteúdo (máx 60 caracteres)
+- Se o título for irrelevante ou apenas código, gere um título novo baseado no tópico.
+- Retorne APENAS o novo título, sem explicações.`;
+
+    const result = await model.generateContent(prompt);
+    return result.response.text().trim() || rawTitle;
+  } catch (error) {
+    console.error("[AI-Beautify] Erro ao embelezar título:", error);
+    return rawTitle;
+  }
+}
+
 export async function generateSearchQueries(
   input: QueryGenInput
 ): Promise<QueryGenOutput[]> {

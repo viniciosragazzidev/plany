@@ -6,9 +6,16 @@ import { NextRequest, NextResponse } from "next/server";
  * Following the new Next.js 16.2.6 convention where middleware is renamed to proxy.
  */
 export async function proxy(request: NextRequest) {
-    const session = await auth.api.getSession({
-        headers: request.headers,
-    });
+    let session = null;
+    try {
+        session = await auth.api.getSession({
+            headers: request.headers,
+        });
+    } catch (error) {
+        console.error("[Proxy Auth Error] Falha crítica ao recuperar sessão (Provável erro de conexão com Banco de Dados):", error);
+        // Em caso de erro de conexão, tratamos como sem sessão para evitar crash infinito
+        session = null;
+    }
 
     const { pathname } = request.nextUrl;
 

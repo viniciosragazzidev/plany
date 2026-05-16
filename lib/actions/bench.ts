@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 // @ts-expect-error: pdf-parse-fork lacks type definitions
 import pdf from 'pdf-parse-fork';
 import { GoogleGenAI } from "@google/genai";
-import { generateSearchQueries, QueryGenInput } from "@/lib/web-research";
+import { generateSearchQueries, QueryGenInput, researchEmptyEditalTopics, beautifyMaterialTitle } from "@/lib/web-research";
 import { htmlToMarkdown } from "@/lib/markdown-converter";
 import { scrapeSearchResults, calculateAuthorityScore } from "@/lib/web-scraper";
 
@@ -572,9 +572,16 @@ export async function performWebResearch(
   targetCount: number = 3
 ) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+    // Robust session check for Next.js 15/16
+    let session;
+    try {
+        const currentHeaders = await headers();
+        session = await auth.api.getSession({
+            headers: currentHeaders,
+        });
+    } catch (authError) {
+        console.warn("[Auth] Falha ao recuperar sessão via headers:", authError);
+    }
 
     // Fetch bench and edital content
     const bench = await db.query.studyBenches.findFirst({
@@ -590,10 +597,6 @@ export async function performWebResearch(
       .set({ researchStatus: "researching" })
       .where(eq(studyBenches.id, benchId));
     
-    // ... rest of logic ...
-    
-    // ... rest of logic until results.push ...
-
     // Get topics from edital strictly filtered by selected subjects
     let topics: string[] = [];
 
@@ -627,12 +630,42 @@ export async function performWebResearch(
           filteredEditalItems.map((item) => `${item.category}: ${item.topic}`)
         ),
       ];
+
+      // NOVO FLUXO: Se o edital foi importado (tem texto) MAS não tem conteúdo programático extraído
+      if (topics.length === 0 && bench.examNotice) {
+         // FASE DE PESQUISA PRÉVIA: Buscar na web o conteúdo programático real do concurso
+         let webContext = "";
+         try {
+            const syllabusQuery = `conteúdo programático edital ${bench.goalName} ${bench.examBoard || ""}`;
+            const syllabusScrap = await scrapeSearchResults(syllabusQuery, "Syllabus Research", 3);
+            webContext = syllabusScrap.map(s => s.markdownContent).join("\n\n---\n\n");
+         } catch (e) {
+            console.error("[Syllabus-Web] Erro ao pesquisar fontes externas:", e);
+         }
+
+         // Aciona a IA para "Pesquisar/Estipular" os tópicos vazios baseados no Edital + Fontes Web
+         const researchedTopics = await researchEmptyEditalTopics(bench.examNotice, webContext);
+         
+         // Filtra os tópicos pesquisados para manter apenas as matérias selecionadas
+         const filteredResearched = researchedTopics.filter(topicStr => {
+            const categoryPart = topicStr.split(':')[0]?.toLowerCase().trim() || "";
+            return subjectTitles.some(title => categoryPart.includes(title) || title.includes(categoryPart));
+         });
+
+         topics = filteredResearched;
+      }
+      
+      // NOVO FLUXO: Se não houver edital NENHUM importado
+      if (topics.length === 0 && !bench.examNotice) {
+         // O Garimpo deve procurar baseado apenas nos Assuntos (Títulos das Matérias)
+         topics = selectedSubjects.map(s => `${bench.goalName}: ${s.title}`);
+      }
     }
 
     if (topics.length === 0) {
       return {
         success: false,
-        error: "Nenhum assunto selecionado no contexto. Ative os switches das matérias que deseja pesquisar.",
+        error: "Nenhum assunto selecionado no contexto, ou o edital não pôde ser interpretado. Ative os switches das matérias que deseja pesquisar.",
       };
     }
 
@@ -643,7 +676,7 @@ export async function performWebResearch(
     // Generate queries for each topic
     const queryInput: QueryGenInput = {
       materia: bench.goalName,
-      topicos: topics,
+      topicos: limitedTopics,
       editalContent: bench.examNotice || undefined,
     };
 
@@ -689,12 +722,15 @@ export async function performWebResearch(
               continue;
             }
 
+            // IA BEAUTIFY TITLE: Clean up the title before saving
+            const cleanTitle = await beautifyMaterialTitle(scraped.title, querySet.topic);
+
             // Save to web_sources
             const webSource = await db
               .insert(webSources)
               .values({
                 benchId: bench.id as any,
-                title: scraped.title,
+                title: cleanTitle,
                 sourceUrl: scraped.sourceUrl,
                 htmlContent: scraped.htmlContent,
                 markdownContent: markdown,
@@ -707,7 +743,7 @@ export async function performWebResearch(
 
             results.push({
               id: webSource[0]?.id,
-              title: scraped.title,
+              title: cleanTitle,
               sourceUrl: scraped.sourceUrl,
               topic: querySet.topic,
               authorityScore,
