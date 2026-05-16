@@ -63,7 +63,8 @@ export function IntelligenceTools({
     isGeneratingFlashcards,
     isGeneratingSummary,
     isEditalConsultantMode,
-    setIsEditalConsultantMode
+    setIsEditalConsultantMode,
+    setSelectedContextSubjects
   } = useBench();
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [isLoadingQuizzes, setIsLoadingQuizzes] = useState(false);
