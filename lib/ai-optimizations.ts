@@ -8,14 +8,23 @@ const genAI = new GoogleGenerativeAI(apiKey || "");
  * Inclui lógica de retry e fallback silencioso se todos os modelos falharem.
  */
 export async function getEmbedding(text: string, maxRetries = 1): Promise<number[] | null> {
-  const models = ["text-embedding-004"];
+  const models = [
+    "models/gemini-embedding-001",
+    "models/text-embedding-004", 
+    "text-embedding-004",
+    "embedding-001"
+  ];
   
   for (const modelName of models) {
     const model = genAI.getGenerativeModel({ model: modelName });
     
     for (let i = 0; i <= maxRetries; i++) {
       try {
-        const result = await model.embedContent(text);
+        const result = await model.embedContent({
+          content: { parts: [{ text: text.substring(0, 30000) }] },
+          // @ts-ignore
+          outputDimensionality: 768
+        });
         const values = result.embedding.values;
         
         if (values) return values;

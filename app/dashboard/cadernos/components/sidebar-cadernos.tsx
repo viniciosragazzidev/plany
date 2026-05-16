@@ -33,6 +33,9 @@ export function SidebarCadernos() {
       content: "",
       updatedAt: new Date()
     };
+    
+    const { addAnotacao, replaceAnotacaoId, deleteAnotacaoLocal, setActiveAnotacao } = useCadernos.getState();
+    
     addAnotacao(newNote);
     
     // Open subject folder
@@ -41,14 +44,23 @@ export function SidebarCadernos() {
     router.push(`/dashboard/cadernos/${tempId}`);
 
     // Persist
-    const res = await createAnotacao(benchId, subjectId, "Nova Anotação");
-    if (res.success && res.anotacao) {
-      // It's tricky to update ID smoothly if already navigating, but Zustand will handle it if we re-sync
-      // For now, redirect to the real one
-      router.push(`/dashboard/cadernos/${res.anotacao.id}`);
-      setActiveAnotacao(res.anotacao.id);
-    } else {
-      toast.error("Erro ao criar anotação");
+    try {
+        const res = await createAnotacao(benchId, subjectId, "Nova Anotação");
+        if (res.success && res.anotacao) {
+            // Replace temp ID with real ID
+            replaceAnotacaoId(tempId, res.anotacao.id);
+            // If the user is still on the temp page, redirect to the real one
+            if (window.location.pathname.includes(tempId)) {
+                router.replace(`/dashboard/cadernos/${res.anotacao.id}`);
+            }
+        } else {
+            throw new Error(res.error || "Erro ao criar anotação");
+        }
+    } catch (error) {
+        // Silent Rollback
+        deleteAnotacaoLocal(tempId);
+        toast.error("Ops, deu um soluço na rede! Tentei criar a anotação, mas não foi. Tenta de novo?");
+        router.push("/dashboard/cadernos");
     }
   };
 
@@ -78,22 +90,6 @@ export function SidebarCadernos() {
                         </Button>
                     }
                 />
-                <Button 
-                    variant="ghost" 
-                    size="icon-sm" 
-                    className="rounded-lg h-7 w-7 text-primary hover:bg-primary/10"
-                    title="Nova Anotação Rápida"
-                    onClick={() => {
-                        // Quick note in the first bench/subject found as a shortcut
-                        if (benches.length > 0 && benches[0].subjects.length > 0) {
-                            handleNewNote(benches[0].id, benches[0].subjects[0].id);
-                        } else {
-                            toast.info("Crie uma bancada e matéria primeiro!");
-                        }
-                    }}
-                >
-                    <HugeiconsIcon icon={Plus} size={16} />
-                </Button>
             </div>
         </div>
         <div className="relative">

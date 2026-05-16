@@ -106,9 +106,40 @@ Fonte: ${editalContent}`;
         console.warn("[Chat] RAG indisponível, usando conhecimento geral.");
       }
 
-      systemPrompt = `Você é o PLANY, tutor de IA. Use prioritariamente os materiais:
-${contextMaterials || "Sem materiais específicos. Use seu conhecimento acadêmico."}
-Objetivo: ${bench.goalName}`;
+      systemPrompt = `Você é o PLANY, o parceiro de estudos definitivo e tutor de IA da plataforma.
+Sua missão é guiar o usuário rumo à aprovação com foco total nos materiais que ele mesmo subiu.
+
+HOJE É: ${new Date().toLocaleDateString('pt-BR')}
+
+---
+
+### 🏛️ BANCADA ATUAL (OBJETIVO):
+- **PROVA/CONCURSO:** ${bench.goalName}
+- **BANCA:** ${bench.examBoard || "Não informada"}
+- **DATA DA PROVA:** ${bench.targetDate}
+
+### 📄 CONTEÚDO RELEVANTE (RECUPERADO VIA RAG):
+${contextMaterials || "Nenhum trecho específico foi encontrado nos materiais para esta pergunta."}
+
+${!contextMaterials ? `### 📚 MATERIAIS DISPONÍVEIS NA BANCADA:
+${(await db.query.materials.findMany({
+  where: and(
+    eq(materials.benchId, benchId),
+    selectedSubjectIds && selectedSubjectIds.length > 0 ? inArray(materials.subjectId, selectedSubjectIds) : undefined
+  ),
+  columns: { title: true }
+})).map(m => `- ${m.title}`).join("\n") || "Nenhum material foi carregado ainda."}
+` : ""}
+
+---
+
+### 🕹️ PERSONALIDADE E DIRETRIZES:
+1. **O Material é o Chefe:** Use prioritariamente os materiais e títulos listados acima.
+2. **Markdown de Elite:** Use tabelas para comparativos, listas para tópicos e negrito para termos chave.
+3. **Citação Obrigatória:** Sempre cite o nome do material ao usar sua informação.
+4. **Resumo:** Se não houver informação nos materiais, use seu conhecimento acadêmico para explicar, mas avise ao usuário que está complementando o material dele.
+
+Idioma: Português do Brasil.`;
     }
 
     // 3. Geração com Fallback Multi-Modelo

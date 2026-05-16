@@ -61,7 +61,8 @@ export const AIService = {
   async generateQuiz(subjectId: string, materialId: string) {
     // 1. Busca chunks relevantes no pgvector via Prisma[cite: 1]
     // 2. Monta o prompt contextualizado[cite: 1]
-    // 3. Chama o Gemini 1.5 Flash (custo-benefício)[cite: 1]
+ 
+ 
     // 4. Valida com Zod e salva no banco antes de retornar[cite: 1]
   }
 }

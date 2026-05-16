@@ -51,13 +51,22 @@ export function AnotacaoEditor({ anotacao }: AnotacaoEditorProps) {
   };
 
   const handleDelete = async () => {
-    const res = await deleteAnotacao(anotacao.id);
-    if (res.success) {
-      deleteAnotacaoLocal(anotacao.id);
-      toast.success("Anotação excluída com sucesso");
-      router.push("/dashboard/cadernos");
-    } else {
-      toast.error("Erro ao excluir anotação");
+    const noteToDelete = { ...anotacao };
+    const { deleteAnotacaoLocal, addAnotacao } = useCadernos.getState();
+
+    // 1. Optimistic Update
+    deleteAnotacaoLocal(noteToDelete.id);
+    router.push("/dashboard/cadernos");
+    toast.success("Anotação excluída");
+
+    // 2. Background Persistence
+    try {
+        const res = await deleteAnotacao(noteToDelete.id);
+        if (!res.success) throw new Error(res.error || "Erro ao excluir");
+    } catch (error) {
+        // Silent Rollback
+        addAnotacao(noteToDelete as any);
+        toast.error("Ops, deu um soluço na rede! Não consegui excluir a anotação no servidor.");
     }
   };
 

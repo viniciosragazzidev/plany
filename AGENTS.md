@@ -1,6 +1,6 @@
 {
   "system_protocol": "EduAI-Core-v2-Pro",
-  "engine_base": "Gemini 1.5 Pro - Estabilidade e Contexto Expandido",
+  "engine_base": "Gemini 2.5 flash - Estabilidade e Contexto Expandido",
   "user_context": {
     "name": "Marcos Vinicios Ragazzi Araujo",
     "role": "Fullstack Developer & CEO Kyper Agência",

@@ -5,12 +5,18 @@ Este arquivo consolida todas as regras, padrões arquiteturais, de UX e de códi
 ---
 
 ## 1. Arquitetura Local-First & Performance (0ms)
-A aplicação deve parecer um software nativo, respondendo instantaneamente às interações do usuário.
+**REGRA DE OURO:** A interface deve reagir instantaneamente (0ms) a qualquer ação de escrita do usuário. O PLANY não é um site, é um software nativo no navegador.
 
-- **Estado Local e Sincronização:** Utilize **Zustand** para o estado global da interface e **TanStack Query** para a ponte de dados assíncrona.
-- **Optimistic Updates:** A interface **DEVE** reagir imediatamente à ação do usuário (ex: marcar tópico como concluído) antes da confirmação do servidor. Se houver falha, realize um *Silent Rollback* e avise via Toast.
-- **Processamento em Background:** Tarefas pesadas da IA (conversão de PDF para MD, vetorização) nunca devem bloquear a UI. Use indicadores sutis (como badges de "Sincronizando") na barra lateral enquanto o backend trabalha.
-- **Skeletons:** Use Skeleton screens para disfarçar latência ao invés de spinners de tela cheia.
+- **Mandato de Feedback Instantâneo:** Nunca exiba spinners de tela cheia ou bloqueie a UI enquanto espera o servidor para Mutações (Create, Update, Delete).
+- **Padrão de Optimistic Updates (Zustand/TanStack):**
+    - **Ação:** Atualize o estado local (Zustand) ou o cache (Query) IMEDIATAMENTE.
+    - **Criação:** Use IDs temporários (`temp_...`) para exibir o novo item na hora. Substitua pelo ID real no sucesso da Promise em background.
+    - **Exclusão:** Remova o item da lista e navegue para fora da tela de detalhe (se necessário) instantaneamente.
+- **Sincronização Assíncrona e Resiliência:** 
+    - Toda persistência no banco deve ser tratada como um processo de segundo plano.
+    - **Silent Rollback:** Em caso de erro de rede ou servidor, restaure o estado anterior localmente de forma silenciosa e notifique o usuário via Toast despojado.
+- **Processamento em Background (Non-Blocking AI):** Tarefas pesadas (Vetorização, OCR) devem usar indicadores sutis (badges, glows) e nunca impedir que o usuário continue estudando outras partes do app.
+- **Lógica de Skeletons:** Use Skeletons apenas para o carregamento inicial de dados (Read), nunca para ações de escrita (Write).
 
 ---
 

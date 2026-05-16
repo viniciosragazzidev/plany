@@ -28,8 +28,8 @@
     {
       "categoria": "Engenharia de Prompt Econômica",
       "boas_praticas": [
-        "Use modelos menores e mais baratos (Gemini 2.0 Flash ou 1.5 Flash) para tarefas simples como classificação de matérias ou extração de tópicos.",
-        "Reserve o modelo mais potente (Gemini 1.5 Pro) apenas para explicações complexas ou geração de simulados finais.",
+        "Use modelos menores e mais baratos (Gemini 2.5 flash) para tarefas simples como classificação de matérias ou extração de tópicos.",
+        "Reserve o modelo mais potente (Gemini 2.5 flash) apenas para explicações complexas ou geração de simulados finais.",
         "Force a saída em JSON estruturado para evitar que a IA gaste tokens com conversas desnecessárias ('Aqui está seu quiz:', etc)."
       ]
     }

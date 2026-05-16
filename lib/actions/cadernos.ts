@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { materials, studyBenches, subjects, editalItems, materialChunks } from "@/lib/db/schema";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -87,9 +87,22 @@ export async function updateAnotacaoContent(materialId: string, content: string,
         // 2. Extrair texto legível para vetorização
         let plainText = "";
         try {
-            if (content.trim().startsWith("[") || content.trim().startsWith("{")) {
+            if (content.trim().startsWith("{")) {
                 const parsed = JSON.parse(content);
-                if (Array.isArray(parsed)) {
+                // TipTap JSON logic
+                const extractText = (node: any): string => {
+                    if (node.type === "text") return node.text || "";
+                    if (node.content && Array.isArray(node.content)) {
+                        return node.content.map(extractText).join("");
+                    }
+                    return "";
+                };
+
+                if (parsed.type === "doc" && Array.isArray(parsed.content)) {
+                    plainText = parsed.content.map((block: any) => {
+                        return extractText(block);
+                    }).filter(Boolean).join("\n\n");
+                } else if (Array.isArray(parsed)) {
                     plainText = parsed.map((b: any) => {
                         if (b.content && Array.isArray(b.content)) {
                             return b.content.map((t: any) => t.text || "").join(" ");
@@ -100,6 +113,7 @@ export async function updateAnotacaoContent(materialId: string, content: string,
                     plainText = content.replace(/<[^>]*>/g, " ");
                 }
             } else {
+                // Markdown or Plain Text
                 plainText = content.replace(/<[^>]*>/g, " ");
             }
         } catch (e) {
@@ -108,10 +122,12 @@ export async function updateAnotacaoContent(materialId: string, content: string,
 
         const newHash = createHash("sha256").update(plainText).digest("hex");
         
-        // 3. Only update and re-vectorize if hash changed
-        if (currentMaterial?.contentHash !== newHash) {
-            dataToUpdate.contentHash = newHash;
-            
+        // 3. Only update and re-vectorize if hash changed OR if chunks are missing
+        const existingChunks = await db.select({ count: sql<number>`count(*)` }).from(materialChunks).where(eq(materialChunks.materialId, materialId));
+        const hasNoChunks = existingChunks[0].count === 0;
+
+        if (currentMaterial?.contentHash !== newHash || (hasNoChunks && plainText.trim().length > 0)) {
+            // Update basic content first
             const [material] = await db.update(materials)
                 .set(dataToUpdate)
                 .where(eq(materials.id, materialId))
@@ -122,31 +138,32 @@ export async function updateAnotacaoContent(materialId: string, content: string,
                 const { chunkMarkdown, getEmbedding } = await import("@/lib/ai-optimizations");
                 const chunks = chunkMarkdown(plainText);
                 
-                // Limpa chunks antigos APENAS se formos gerar novos com sucesso
-                // Para simplificar o MVP e evitar inconsistência por 429, 
-                // vamos tentar vetorizar e só se não der erro crítico limpamos os antigos.
-                // Mas o padrão atual é deletar e reinserir.
-                
                 try {
                     const newChunks = [];
                     for (const chunk of chunks) {
                         const embedding = await getEmbedding(chunk);
-                        newChunks.push({
-                            materialId,
-                            content: chunk,
-                            embedding
-                        });
+                        if (embedding) {
+                            newChunks.push({
+                                materialId,
+                                content: chunk,
+                                embedding
+                            });
+                        }
                     }
                     
-                    // Se chegou aqui sem erro de quota, podemos atualizar o banco
-                    await db.delete(materialChunks).where(eq(materialChunks.materialId, materialId));
-                    for (const nc of newChunks) {
-                        await db.insert(materialChunks).values(nc);
+                    // Se conseguimos vetorizar pelo menos um chunk, atualizamos os chunks e o hash
+                    if (newChunks.length > 0) {
+                        await db.transaction(async (tx) => {
+                            await tx.delete(materialChunks).where(eq(materialChunks.materialId, materialId));
+                            for (const nc of newChunks) {
+                                await tx.insert(materialChunks).values(nc);
+                            }
+                            // Atualiza o hash APENAS após sucesso na vetorização
+                            await tx.update(materials).set({ contentHash: newHash }).where(eq(materials.id, materialId));
+                        });
                     }
                 } catch (err: any) {
                     console.error("Erro ao vetorizar anotação (Quota ou API):", err);
-                    // Se for erro de quota (429), apenas logamos e mantemos os chunks antigos
-                    // ou o estado atual sem novos chunks. O importante é não quebrar o save do texto.
                 }
             }
 
