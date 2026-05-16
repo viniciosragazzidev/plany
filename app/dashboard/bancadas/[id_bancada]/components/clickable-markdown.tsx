@@ -64,9 +64,9 @@ export function ClickableMarkdown({ content, className, isLoading }: ClickableMa
         });
     }
 
-    // 4. Transformar marcadores em sintaxe de link customizada
+    // 4. Transformar marcadores em sintaxe de link customizada (usando fragmento para evitar nova aba)
     termMap.forEach((data, marker) => {
-      result = result.replaceAll(marker, `[${data.topic}](clickable:${encodeURIComponent(data.category)})`);
+      result = result.replaceAll(marker, `[${data.topic}](#explain:${encodeURIComponent(data.category)})`);
     });
 
     // 5. Restaurar blocos protegidos
@@ -80,10 +80,10 @@ export function ClickableMarkdown({ content, className, isLoading }: ClickableMa
   const components = {
     // Custom link renderer
     a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
-      const isClickable = href?.includes('clickable:');
+      const isClickable = href?.includes('#explain:');
       
       if (isClickable && href) {
-        const parts = href.split('clickable:');
+        const parts = href.split('#explain:');
         const context = decodeURIComponent(parts[parts.length - 1]);
         const term = React.Children.toArray(children).join('');
         
@@ -137,7 +137,10 @@ export function ClickableMarkdown({ content, className, isLoading }: ClickableMa
 
   return (
     <div className={cn("clickable-markdown-container", className)}>
-      <ReactMarkdown components={components as any}>
+      <ReactMarkdown 
+        components={components as any}
+        urlTransform={(url) => url.startsWith('#explain:') ? url : url}
+      >
         {processedContent}
       </ReactMarkdown>
     </div>
