@@ -56,7 +56,7 @@ export function ImportEditalDialog({ benchId, onSuccess, trigger }: ImportEdital
       const result = await processEditalPDF(formData);
       if (result.success) {
         toast.success("Edital processado com sucesso!", {
-          description: `Extraímos ${result.topicCount} tópicos do edital.`,
+          description: `Extraímos ${result.data?.topicCount || 0} tópicos do edital.`,
         });
         onSuccess();
         setIsOpen(false);

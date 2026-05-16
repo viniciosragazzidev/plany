@@ -4,14 +4,17 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useChatOverlay } from "@/hooks/use-chat-overlay";
 import { 
   SentIcon, 
   AiChat01Icon, 
   UserIcon,
-  SparklesIcon,
   InformationCircleIcon,
   ZapIcon,
-  BrainIcon
+  BrainIcon,
+  Maximize01Icon,
+  Minimize01Icon,
+  Cancel01Icon
 } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +24,6 @@ import { ClickableMarkdown } from "./clickable-markdown";
 import { useBench } from "./bench-context";
 import { Badge } from "@/components/ui/badge";
 import { SkeletonSync } from "@/components/ui/skeleton-sync";
-import {  } from "@hugeicons/core-free-icons";
 
 interface Message {
   role: 'user' | 'assistant';
@@ -33,6 +35,7 @@ export function ChatBench() {
   const params = useParams();
   const benchId = params.id_bancada as string;
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { isOpen, closeChat, toggleMaximize, isMaximized } = useChatOverlay();
   const { 
     selectedContextSubjects, 
     externalMessage, 
@@ -147,9 +150,15 @@ export function ChatBench() {
   }, [externalMessage, handleSend, setExternalMessage]);
 
   return (
-    <div className="flex flex-col h-full flex-1 bg-background relative overflow-hidden font-sans">
+    <div className={cn(
+      "flex flex-col h-full w-full bg-background relative overflow-hidden font-sans transition-all duration-500",
+      !isMaximized && "rounded-2xl border border-border/50 shadow-2xl"
+    )}>
       {/* Chat Header */}
-      <div className="p-6 border-b border-border/50 flex justify-between items-center bg-background/50 backdrop-blur-md sticky top-0 z-10 transition-all">
+      <div className={cn(
+        "p-6 border-b border-border/50 flex justify-between items-center bg-background/50 backdrop-blur-md sticky top-0 z-10 transition-all duration-500 ease-in-out",
+        isOpen ? "translate-y-0 opacity-100" : "-translate-y-8 opacity-0"
+      )}>
         <div className="flex items-center gap-3 group">
           <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform duration-300">
             <HugeiconsIcon icon={AiChat01Icon} size={20} />
@@ -163,33 +172,58 @@ export function ChatBench() {
           </div>
         </div>
         
-        <Button variant="outline" size="xs" className="rounded-lg gap-1.5 h-8 hover:bg-primary/5 transition-all group">
-          <HugeiconsIcon icon={SparklesIcon} size={14} className="text-primary group-hover:rotate-12 transition-transform" />
-          Sugestões
-        </Button>
+        <div className="flex items-center gap-1">
+            <Button 
+                variant="ghost" 
+                size="icon-sm" 
+                className="h-8 w-8 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5"
+                onClick={toggleMaximize}
+                title={isMaximized ? "Restaurar" : "Maximizar"}
+            >
+                <HugeiconsIcon icon={isMaximized ? Minimize01Icon : Maximize01Icon} size={16} />
+            </Button>
+            <Button 
+                variant="ghost" 
+                size="icon-sm" 
+                className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5"
+                onClick={closeChat}
+            >
+                <HugeiconsIcon icon={Cancel01Icon} size={16} />
+            </Button>
+        </div>
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-secondary">
+      <div className={cn(
+        "flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-secondary transition-all duration-500",
+        isOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+      )}>
         {messages.map((msg, i) => {
           const isLastMessage = i === messages.length - 1;
           const showTypewriter = isLastMessage && msg.role === 'assistant';
 
           return (
-            <div key={i} className={cn(
-              "flex gap-4 max-w-[90%] animate-in fade-in slide-in-from-bottom-2 duration-300",
-              msg.role === 'user' ? "ml-auto flex-row-reverse" : ""
-            )}>
+            <div 
+              key={i} 
+              className={cn(
+                "flex gap-4 max-w-[90%] transition-all duration-500 ease-out",
+                msg.role === 'user' ? "ml-auto flex-row-reverse" : "",
+                isOpen ? "translate-y-0 opacity-100 scale-100" : "translate-y-8 opacity-0 scale-95"
+              )}
+              style={{ transitionDelay: `${isOpen ? (150 + Math.min(i * 40, 200)) : 0}ms` }}
+            >
               <div className={cn(
                 "w-8 h-8 rounded-lg shrink-0 flex items-center justify-center mt-1 transition-all",
-                msg.role === 'assistant' ? "bg-primary/10 text-primary" : "bg-secondary/20 text-muted-foreground"
+                msg.role === 'assistant' ? "bg-primary/10 text-primary shadow-sm" : "bg-secondary/20 text-muted-foreground"
               )}>
                 <HugeiconsIcon icon={msg.role === 'assistant' ? AiChat01Icon : UserIcon} size={16} />
               </div>
               <div className="flex flex-col gap-1 w-full relative">
                 <div className={cn(
-                  "p-4 rounded-2xl text-sm leading-relaxed relative group/msg",
-                  msg.role === 'assistant' ? "bg-secondary/10 text-foreground" : "bg-primary text-primary-foreground shadow-lg shadow-primary/10"
+                  "p-4 rounded-2xl text-sm leading-relaxed relative group/msg transition-all duration-300",
+                  msg.role === 'assistant' 
+                    ? "bg-secondary/10 text-foreground hover:bg-secondary/15" 
+                    : "bg-primary text-primary-foreground shadow-lg shadow-primary/10 hover:shadow-primary/20"
                 )}>
                   {msg.role === 'assistant' && msg.isCached && (
                     <div className="absolute -top-2 -right-2 p-1 bg-blue-500 text-white rounded-full shadow-lg animate-in zoom-in duration-300" title="Resposta instantânea do cache">
@@ -250,7 +284,10 @@ export function ChatBench() {
       </div>
 
       {/* Input Area */}
-      <div className="p-6 bg-gradient-to-t from-background via-background to-transparent pt-10">
+      <div className={cn(
+        "p-6 bg-gradient-to-t from-background via-background to-transparent pt-10 transition-all duration-500 ease-out",
+        isOpen ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
+      )}>
         <div className="max-w-3xl mx-auto w-full space-y-4">
           {isEditalConsultantMode ? (
             <div className="flex justify-center">

@@ -170,7 +170,7 @@ export function IntelligenceTools({
   }
 
   return (
-    <div className="flex flex-col h-full bg-secondary/5 border-l border-border/50 w-80 shrink-0 font-sans relative overflow-hidden">
+    <div className="flex flex-col h-full bg-secondary/5 border-l border-border/50 w-80 shrink-0 font-sans relative overflow-hidden z-10">
       {/* Main Tools Panel */}
       <div className="flex flex-col h-full w-full">
         <div className="p-6 border-b border-border/50 flex justify-between items-center bg-background/50">

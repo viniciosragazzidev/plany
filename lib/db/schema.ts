@@ -270,12 +270,19 @@ export const materialChunks = pgTable("material_chunks", {
   materialId: uuid("material_id")
     .notNull()
     .references(() => materials.id, { onDelete: "cascade" }),
+  subjectId: uuid("subject_id")
+    .references(() => subjects.id, { onDelete: "set null" }),
+  topicId: uuid("topic_id")
+    .references(() => editalItems.id, { onDelete: "set null" }),
+  originTag: text("origin_tag"), // "Dica", "Exemplo", "Lei", "Macete"
   content: text("content").notNull(),
   embedding: vector("embedding", { dimensions: 768 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => {
   return {
     embeddingIndex: index("embeddingIndex").using("hnsw", table.embedding.op("vector_cosine_ops")),
+    subjectIdx: index("mc_subject_idx").on(table.subjectId),
+    topicIdx: index("mc_topic_idx").on(table.topicId),
   };
 });
 

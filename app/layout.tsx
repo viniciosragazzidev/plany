@@ -21,6 +21,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "BrainBench AI",
   description: "Sistema de gestão de aprendizagem proativo",
+  icons: {
+    icon: "/logo.ico",
+  }
 };
 
 export default function RootLayout({

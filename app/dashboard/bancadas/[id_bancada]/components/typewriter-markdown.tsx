@@ -59,20 +59,20 @@ export function TypewriterMarkdown({
 
   return (
     <div className="relative group/typewriter">
-      <div className={className}>
-        <ClickableMarkdown content={displayedContent} isLoading={isLoading} />
-      </div>
       {!isFinished && displayedContent.length > 50 && (
         <Button 
           variant="ghost" 
           size="xs" 
-          className="absolute -bottom-6 right-0 text-[10px] h-6 px-2 opacity-0 group-hover/typewriter:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
+          className="absolute -top-6 right-0 text-[10px] h-6 px-2 opacity-0 group-hover/typewriter:opacity-100 transition-opacity text-muted-foreground hover:text-primary z-20"
           onClick={handleSkip}
         >
           <HugeiconsIcon icon={FastForward} size={10} className="mr-1" />
           Pular para o fim
         </Button>
       )}
+      <div className={className}>
+        <ClickableMarkdown content={displayedContent} isLoading={isLoading} />
+      </div>
     </div>
   );
 }

@@ -9,7 +9,8 @@ import { ArrowLeft01Icon, Book01Icon, Search01Icon } from "@hugeicons/core-free-
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { SourceColumn } from "./components/source-column";
-import { ChatBench } from "./components/chat-bench";
+import { BenchDashboard } from "./components/bench-dashboard";
+import { ChatOverlay } from "./components/chat-overlay";
 import { IntelligenceTools } from "./components/intelligence-tools";
 import { DeleteBenchButton } from "./components/delete-bench-button";
 import { NotificationCenter } from "../../components/ui/notification-center";
@@ -78,7 +79,7 @@ export default async function BenchDetailPage({
       initialResearchStatus={bench.researchStatus}
       editalItems={items as any}
     >
-      <div className="flex flex-col h-screen bg-background overflow-hidden font-sans">
+      <div className="flex flex-col h-screen bg-background overflow-hidden font-sans min-h-0">
         {/* Top Header */}
         <header className="h-16 border-b border-border/50 px-6 flex items-center justify-between bg-background/80 backdrop-blur-md z-20 shrink-0">
           <div className="flex items-center gap-4">
@@ -108,15 +109,15 @@ export default async function BenchDetailPage({
           </div>
         </header>
 
-        {/* Main Content: 3 Columns */}
-        <div className="flex flex-1 overflow-hidden">
+        {/* Main Content: 3 Columns (Center is now Dashboard) */}
+        <div className="flex flex-1 overflow-hidden relative min-h-0">
           {/* Left Column: Sources */}
           <SourceColumn 
             benchId={bench.id} 
           />
 
-          {/* Center Column: AI Chat */}
-          <ChatBench />
+          {/* Center Column: Dashboard (Was AI Chat) */}
+          <BenchDashboard />
 
           {/* Right Column: Intelligence Tools */}
           <IntelligenceTools 
@@ -128,6 +129,9 @@ export default async function BenchDetailPage({
             materials={benchMaterials as any}
           />
         </div>
+
+        {/* New Floating Chat Overlay */}
+        <ChatOverlay />
       </div>
     </BenchProvider>
   );

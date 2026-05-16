@@ -93,7 +93,7 @@ export function SourceColumn({ benchId }: SourceColumnProps) {
   const uncategorizedMaterials = getMaterialsBySubject(null);
 
   return (
-    <div className="flex flex-col h-full bg-secondary/5 border-r border-border/50 w-[350px] shrink-0 font-sans transition-all">
+    <div className="flex flex-col h-full bg-secondary/5 border-r border-border/50 w-[350px] shrink-0 font-sans transition-all relative z-10">
       {/* Header with Search and Actions */}
       <div className="p-4 space-y-4 border-b border-border/50 bg-background/50">
         <div className="flex items-center justify-between">

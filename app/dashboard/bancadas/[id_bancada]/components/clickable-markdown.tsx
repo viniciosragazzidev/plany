@@ -3,6 +3,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useBench } from './bench-context';
+import { useParams } from 'next/navigation';
 
 interface ClickableMarkdownProps {
   content: string;
@@ -15,7 +16,8 @@ interface ClickableMarkdownProps {
  * and transforms them into clickable links that trigger AI explanations.
  */
 export function ClickableMarkdown({ content, className, isLoading }: ClickableMarkdownProps) {
-  const { editalItems, setExternalMessage } = useBench();
+  const { editalItems, setExternalMessage, selectedContextSubjects } = useBench();
+  const params = useParams();
 
   // Pre-process content to wrap technical terms in a custom clickable link syntax
   const processedContent = React.useMemo(() => {
@@ -37,7 +39,8 @@ export function ClickableMarkdown({ content, className, isLoading }: ClickableMa
 
     result = result.replace(/\[\[(.*?)\]\]/g, (match, term) => {
         const marker = `__TERM_MARKER_AI_${markerIndex++}__`;
-        termMap.set(marker, { topic: term, category: "Concurso" }); // Categoria genérica ou inferida
+        // Tentamos pegar uma categoria real se possível, senão usamos o assunto da bancada
+        termMap.set(marker, { topic: term, category: "Geral" }); 
         return marker;
     });
 
@@ -49,14 +52,10 @@ export function ClickableMarkdown({ content, className, isLoading }: ClickableMa
 
         terms.forEach((item) => {
           const escapedTopic = item.topic.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          // Regex mais flexível para capturar termos com barras ou caracteres especiais
-          // Evitamos capturar dentro de outros marcadores
           const regex = new RegExp(`(?<![a-zA-Z0-9_])(${escapedTopic})(?![a-zA-Z0-9_])`, 'gi');
           
           result = result.replace(regex, (match) => {
-            // Verificamos se o match já é um marcador
             if (match.startsWith('__TERM_MARKER')) return match;
-            
             const marker = `__TERM_MARKER_ED_${markerIndex++}__`;
             termMap.set(marker, { topic: match, category: item.category });
             return marker;
@@ -64,7 +63,7 @@ export function ClickableMarkdown({ content, className, isLoading }: ClickableMa
         });
     }
 
-    // 4. Transformar marcadores em sintaxe de link customizada (usando fragmento para evitar nova aba)
+    // 4. Transformar marcadores em sintaxe de link customizada
     termMap.forEach((data, marker) => {
       result = result.replaceAll(marker, `[${data.topic}](#explain:${encodeURIComponent(data.category)})`);
     });
@@ -84,15 +83,18 @@ export function ClickableMarkdown({ content, className, isLoading }: ClickableMa
       
       if (isClickable && href) {
         const parts = href.split('#explain:');
-        const context = decodeURIComponent(parts[parts.length - 1]);
+        const rawCategory = decodeURIComponent(parts[parts.length - 1]);
         const term = React.Children.toArray(children).join('');
+
+        // Se a categoria for "Geral", tentamos inferir algo melhor do contexto local da bancada
+        const context = rawCategory === "Geral" ? "este assunto" : rawCategory;
         
         return (
           <button
             type="button"
             disabled={isLoading}
             className={cn(
-              "inline-flex items-baseline cursor-pointer border-b border-dotted border-primary/50 text-foreground font-semibold hover:border-primary hover:text-primary transition-all px-0.5 rounded-sm h-auto align-baseline decoration-dotted",
+              "inline-flex items-baseline cursor-pointer border-b border-dotted border-primary/50 text-primary font-bold hover:border-primary transition-all px-0.5 rounded-sm h-auto align-baseline decoration-dotted",
               isLoading ? "opacity-50 cursor-not-allowed border-muted-foreground/30" : "hover:bg-primary/5 active:scale-95"
             )}
             onClick={(e) => {

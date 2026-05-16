@@ -10,17 +10,16 @@ import { GoogleGenAI } from "@google/genai";
 import { generateSearchQueries, QueryGenInput } from "@/lib/web-research";
 import { htmlToMarkdown } from "@/lib/markdown-converter";
 import { scrapeSearchResults, calculateAuthorityScore } from "@/lib/web-scraper";
-import { chunkMarkdown, getEmbedding } from "@/lib/ai-optimizations";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const ai = new GoogleGenAI({ apiKey: apiKey || "" });
 
-export async function processEditalPDF(formData: FormData) {
+export async function processEditalPDF(formData: FormData): Promise<ActionResponse<{ topicCount: number }>> {
   const file = formData.get("file") as File;
   const benchId = formData.get("benchId") as string;
 
   if (!file || !benchId) {
-    return { success: false, error: "Arquivo ou ID da bancada ausente" };
+    return actionError("Arquivo ou ID da bancada ausente");
   }
 
   try {
@@ -121,22 +120,32 @@ export async function processEditalPDF(formData: FormData) {
         content: editalMarkdown,
       }).returning();
 
+      const { chunkMarkdown, getEmbedding, classifyChunk } = await import("@/lib/ai-optimizations");
       const chunks = chunkMarkdown(editalMarkdown);
       for (const chunk of chunks) {
-        const embedding = await getEmbedding(chunk);
-        await tx.insert(materialChunks).values({
-          materialId: editalMaterial.id,
-          content: chunk,
-          embedding: embedding,
-        });
+        const [embedding, originTag] = await Promise.all([
+          getEmbedding(chunk),
+          classifyChunk(chunk)
+        ]);
+
+        if (embedding) {
+          await tx.insert(materialChunks).values({
+            materialId: editalMaterial.id,
+            content: chunk,
+            embedding,
+            subjectId: editalMaterial.subjectId,
+            topicId: editalMaterial.editalItemId,
+            originTag
+          });
+        }
       }
     });
 
     revalidatePath(`/dashboard/bancadas/${benchId}`);
-    return { success: true, topicCount: items?.length || 0 };
+    return actionSuccess({ topicCount: items?.length || 0 }, "Edital processado com sucesso");
   } catch (error: any) {
     console.error("Erro ao processar Edital:", error);
-    return { success: false, error: error.message };
+    return actionError(error.message);
   }
 }
 
@@ -330,15 +339,26 @@ export async function addMaterial(formData: FormData): Promise<ActionResponse<{ 
 
     // STEP: Surgical RAG - Chunking and Vectorization
     if (content && content.trim().length > 0) {
+      const { chunkMarkdown, getEmbedding, classifyChunk } = await import("@/lib/ai-optimizations");
       const chunks = chunkMarkdown(content);
+      
       for (const chunk of chunks) {
         try {
-          const embedding = await getEmbedding(chunk);
-          await db.insert(materialChunks).values({
-            materialId: material.id,
-            content: chunk,
-            embedding: embedding,
-          });
+          const [embedding, originTag] = await Promise.all([
+            getEmbedding(chunk),
+            classifyChunk(chunk)
+          ]);
+
+          if (embedding) {
+            await db.insert(materialChunks).values({
+              materialId: material.id,
+              content: chunk,
+              embedding,
+              subjectId: material.subjectId,
+              topicId: material.editalItemId,
+              originTag
+            });
+          }
         } catch (err) {
           console.error(`Erro ao vetorizar chunk do material ${material.id}:`, err);
         }
@@ -407,7 +427,46 @@ export async function updateSubject(subjectId: string, data: { title?: string; c
   }
 }
 
+export async function getContextualNotes(
+  subjectId: string, 
+  topicId: string | null, 
+  query: string,
+  limit: number = 5
+) {
+  try {
+    const { getEmbedding } = await import("@/lib/ai-optimizations");
+    const queryEmbedding = await getEmbedding(query);
+    
+    if (!queryEmbedding) return { success: false, chunks: [] };
+
+    const similarity = sql<number>`1 - (${materialChunks.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector)`;
+
+    const conditions = [eq(materialChunks.subjectId, subjectId)];
+    if (topicId) {
+      conditions.push(eq(materialChunks.topicId, topicId));
+    }
+
+    const results = await db
+      .select({
+        id: materialChunks.id,
+        content: materialChunks.content,
+        originTag: materialChunks.originTag,
+        similarity
+      })
+      .from(materialChunks)
+      .where(and(...conditions))
+      .orderBy((t) => desc(t.similarity))
+      .limit(limit);
+
+    return { success: true, chunks: results };
+  } catch (error: any) {
+    console.error("Erro ao buscar notas contextuais:", error);
+    return { success: false, error: error.message };
+  }
+}
+
 import { ActionResponse, actionError, actionSuccess, IdSchema } from "./types";
+import { and, desc } from "drizzle-orm";
 
 export async function deleteSubject(subjectId: string): Promise<ActionResponse<null>> {
   const validation = IdSchema.safeParse(subjectId);
@@ -800,15 +859,25 @@ export async function importWebMaterials(webSourceIds: string[]) {
 
         // STEP: Surgical RAG - Chunking and Vectorization
         if (source.markdownContent) {
+          const { chunkMarkdown, getEmbedding, classifyChunk } = await import("@/lib/ai-optimizations");
           const chunks = chunkMarkdown(source.markdownContent);
           for (const chunk of chunks) {
             try {
-              const embedding = await getEmbedding(chunk);
-              await db.insert(materialChunks).values({
-                materialId: material.id,
-                content: chunk,
-                embedding: embedding,
-              });
+              const [embedding, originTag] = await Promise.all([
+                getEmbedding(chunk),
+                classifyChunk(chunk)
+              ]);
+
+              if (embedding) {
+                await db.insert(materialChunks).values({
+                  materialId: material.id,
+                  content: chunk,
+                  embedding,
+                  subjectId: material.subjectId,
+                  topicId: material.editalItemId,
+                  originTag
+                });
+              }
             } catch (err) {
               console.error(`Erro ao vetorizar chunk do material importado ${material.id}:`, err);
             }

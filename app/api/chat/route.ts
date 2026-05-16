@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
-import { studyBenches, subjects, materials, profiles, editalItems, materialChunks, semanticCache } from "@/lib/db/schema";
+import { studyBenches, materials, materialChunks, semanticCache } from "@/lib/db/schema";
 import { eq, and, inArray, sql, desc } from "drizzle-orm";
 import { getEmbedding } from "@/lib/ai-optimizations";
 
@@ -11,6 +11,11 @@ export const maxDuration = 30;
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(apiKey || "");
+
+interface ChatMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
 
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({
@@ -27,9 +32,14 @@ export async function POST(req: NextRequest) {
       benchId, 
       selectedSubjectIds, 
       isEditalConsultantMode 
+    }: { 
+      messages: ChatMessage[], 
+      benchId: string, 
+      selectedSubjectIds?: string[], 
+      isEditalConsultantMode?: boolean 
     } = await req.json();
 
-    const lastUserMessage = messages.filter((m: any) => m.role === "user").pop()?.content || "";
+    const lastUserMessage = messages.filter((m) => m.role === "user").pop()?.content || "";
 
     // 1. Semantic Cache Check (Graceful)
     let queryEmbedding: number[] | null = null;
@@ -83,6 +93,7 @@ Fonte: ${editalContent}`;
             .select({
               content: materialChunks.content,
               materialTitle: materials.title,
+              originTag: materialChunks.originTag,
               similarity: sql<number>`1 - (${materialChunks.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector)`
             })
             .from(materialChunks)
@@ -96,13 +107,13 @@ Fonte: ${editalContent}`;
               )
             )
             .orderBy(t => desc(t.similarity))
-            .limit(5);
+            .limit(8); // Aumentamos um pouco para ter mais contexto de tags
 
           contextMaterials = relevantChunks
-            .map(c => `--- MATERIAL: ${c.materialTitle} ---\n${c.content}`)
+            .map(c => `--- MATERIAL: ${c.materialTitle} ${c.originTag ? `(Natureza: ${c.originTag})` : ""} ---\n${c.content}`)
             .join("\n\n");
         }
-      } catch (ragError) {
+      } catch {
         console.warn("[Chat] RAG indisponível, usando conhecimento geral.");
       }
 
@@ -135,28 +146,28 @@ ${(await db.query.materials.findMany({
 
 ### 🕹️ PERSONALIDADE E DIRETRIZES:
 1. **O Material é o Chefe:** Use prioritariamente os materiais e títulos listados acima.
-2. **Markdown de Elite:** Use tabelas para comparativos, listas para tópicos e negrito para termos chave.
-3. **Citação Obrigatória:** Sempre cite o nome do material ao usar sua informação.
-4. **Click-to-Explain:** SEMPRE que mencionar um termo técnico, conceito complexo ou tópico do edital, envolva-o em colchetes duplos, assim: **[[Termo Técnico]]**. Isso permitirá que o usuário clique para obter uma explicação detalhada.
-5. **Resumo:** Se não houver informação nos materiais, use seu conhecimento acadêmico para explicar, mas avise ao usuário que está complementando o material dele.
+2. **Priorização Semântica:** Se houver trechos marcados como "Dica" ou "Macete", dê prioridade máxima a eles, pois são as anotações estratégicas do aluno.
+3. **Markdown de Elite:** Use tabelas para comparativos, listas para tópicos e negrito para termos chave.
+4. **Citação Obrigatória:** Sempre cite o nome do material ao usar sua informação.
+5. **Click-to-Explain:** SEMPRE que mencionar um termo técnico, conceito complexo ou tópico do edital, envolva-o em colchetes duplos, assim: **[[Termo Técnico]]**. Isso permitirá que o usuário clique para obter uma explicação detalhada.
+6. **Resumo:** Se não houver informação nos materiais, use seu conhecimento acadêmico para explicar, mas avise ao usuário que está complementando o material dele.
 
 Idioma: Português do Brasil.`;
     }
 
     // 3. Geração com Fallback Multi-Modelo
-    // IMPORTANTE: O Gemini exige que a primeira mensagem do histórico seja obrigatoriamente do 'user'.
-    const rawHistory = messages.slice(0, -1).map((m: any) => ({
-      role: m.role === "assistant" ? "model" : "user",
+    const rawHistory = messages.slice(0, -1).map((m) => ({
+      role: (m.role === "assistant" ? "model" : "user") as "model" | "user",
       parts: [{ text: m.content }],
     }));
 
     // Encontra o índice da primeira mensagem de usuário
-    const firstUserIndex = rawHistory.findIndex((m: any) => m.role === "user");
+    const firstUserIndex = rawHistory.findIndex((m) => m.role === "user");
     const history = firstUserIndex !== -1 ? rawHistory.slice(firstUserIndex) : [];
 
     const models = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
     let resultText = "";
-    let lastError: any;
+    let lastError: Error | undefined;
 
     for (const modelName of models) {
       try {

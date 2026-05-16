@@ -36,6 +36,8 @@ import {
 } from "@/components/ui/dialog";
 import ReactMarkdown from "react-markdown";
 
+import { useChatOverlay } from "@/hooks/use-chat-overlay";
+
 interface SummariesToolProps {
   benchId: string;
   subjects: { id: string; title: string }[];
@@ -43,6 +45,7 @@ interface SummariesToolProps {
 }
 
 export function SummariesTool({ benchId, subjects, materials }: SummariesToolProps) {
+  const { openChat } = useChatOverlay();
   const {
     sidebarState,
     setSidebarState,
@@ -89,10 +92,8 @@ export function SummariesTool({ benchId, subjects, materials }: SummariesToolPro
   const loadSummaries = async () => {
     setIsLoading(true);
     try {
-      const subjectId = subjects.length > 0 ? subjects[0].id : null;
-      if (!subjectId) return;
-
-      const res = await getSummariesAction(benchId, subjectId);
+      // Carrega todos os resumos da bancada, sem filtrar por matéria específica no início
+      const res = await getSummariesAction(benchId);
       if (res.success) {
         setSummariesList(res.summaries || []);
       }
@@ -163,6 +164,7 @@ export function SummariesTool({ benchId, subjects, materials }: SummariesToolPro
   const handleAskInChat = (topicTitle: string) => {
     setExternalMessage(`Pode me explicar melhor sobre "${topicTitle}"?`);
     setSidebarState('default');
+    openChat();
     toast.success("Dúvida enviada para o chat central!");
   };
 

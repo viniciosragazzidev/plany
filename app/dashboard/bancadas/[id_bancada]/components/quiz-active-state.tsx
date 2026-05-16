@@ -19,12 +19,15 @@ import ReactMarkdown from "react-markdown";
 
 import { useBench } from "./bench-context";
 
+import { useChatOverlay } from "@/hooks/use-chat-overlay";
+
 interface QuizActiveStateProps {
   quizId: string;
   onBack: () => void;
 }
 
 export function QuizActiveState({ quizId, onBack }: QuizActiveStateProps) {
+  const { openChat } = useChatOverlay();
   const { setExternalMessage } = useBench();
   const [quiz, setQuiz] = useState<any>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -215,6 +218,7 @@ export function QuizActiveState({ quizId, onBack }: QuizActiveStateProps) {
                 className="w-full rounded-xl gap-2 h-8 text-[10px] font-bold uppercase tracking-tight"
                 onClick={() => {
                   setExternalMessage(`Sobre a questão: "${question.content.substring(0, 100)}...", tenho uma dúvida. A explicação diz: "${question.explanation.substring(0, 100)}...". Pode me explicar melhor?`);
+                  openChat();
                   toast.success("Dúvida enviada para o chat! 💬");
                 }}
              >

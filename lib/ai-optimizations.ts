@@ -89,6 +89,26 @@ export function chunkMarkdown(content: string, maxChunkSize = 1000): string[] {
 }
 
 /**
+ * Classifica a natureza de um trecho de anotação usando Gemini 2.5 Flash.
+ * Objetivo: Enriquecer metadados para RAG cirúrgico.
+ */
+export async function classifyChunk(text: string): Promise<string> {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const prompt = `Analise o trecho de anotação de aula fornecido e retorne estritamente uma única palavra da lista: [Dica, Exemplo, Lei, Macete]. Não explique sua escolha.\n\nTRECHO: "${text.substring(0, 2000)}"`;
+    
+    const result = await model.generateContent(prompt);
+    const category = result.response.text().trim().replace(/[^\w]/g, "");
+    
+    const validCategories = ["Dica", "Exemplo", "Lei", "Macete"];
+    return validCategories.includes(category) ? category : "Outro";
+  } catch (error) {
+    console.error("[AI-Classify] Erro ao classificar chunk:", error);
+    return "Outro";
+  }
+}
+
+/**
  * Calcula a similaridade de cosseno simulada para testes unitários.
  * No ambiente real, isso é feito via pgvector no banco.
  */
