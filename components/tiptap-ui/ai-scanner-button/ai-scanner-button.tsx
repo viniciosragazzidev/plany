@@ -3,6 +3,7 @@
 import { forwardRef, useCallback, useRef, useState } from "react"
 import { ScanEye } from "lucide-react"
 import { toast } from "sonner"
+import { type Editor } from "@tiptap/react"
 
 // --- Hooks ---
 import { useTiptapEditor } from "@/hooks/use-tiptap-editor"
@@ -14,6 +15,10 @@ import { ocrAction } from "@/lib/actions/ocr"
 import { Button, type ButtonProps } from "@/components/tiptap-ui-primitive/button"
 
 export interface AiScannerButtonProps extends Omit<ButtonProps, "type"> {
+  /**
+   * The editor instance.
+   */
+  editor?: Editor
   /**
    * Optional text to display alongside the icon.
    */
@@ -59,7 +64,8 @@ export const AiScannerButton = forwardRef<
           if (result.success) {
             try {
               // Conforme documentação oficial: Usando o MarkdownManager via editor.markdown
-              const markdownManager = (editor as any).markdown
+              // @ts-expect-error - editor.markdown é injetado pela extensão mas não está no tipo base
+              const markdownManager = editor.markdown
               
               if (markdownManager?.parse) {
                 // Parseia o Markdown bruto diretamente para JSON interno (ProseMirror)

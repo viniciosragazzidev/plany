@@ -258,12 +258,14 @@ export function SimpleEditor({ initialContent, onChange }: SimpleEditorProps) {
     content: initialContent || "",
     contentType: "markdown",
     onUpdate: ({ editor }) => {
+      // @ts-expect-error - getMarkdown is added by the extension
       onChange?.(editor.getMarkdown());
     },
   })
 
   // Update content if initialContent changes (e.g. when switching notes)
   useEffect(() => {
+    // @ts-expect-error - getMarkdown is added by the extension
     if (editor && initialContent !== undefined && initialContent !== editor.getMarkdown()) {
       editor.commands.setContent(initialContent, { 
         emitUpdate: false,
@@ -278,10 +280,10 @@ export function SimpleEditor({ initialContent, onChange }: SimpleEditorProps) {
   })
 
   useEffect(() => {
-    if (!isMobile && mobileView !== "main") {
-      setMobileView("main")
+    if (!isMobile) {
+      setMobileView((prev) => (prev !== "main" ? "main" : prev))
     }
-  }, [isMobile, mobileView])
+  }, [isMobile])
 
   return (
     <div className="simple-editor-wrapper">

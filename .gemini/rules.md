@@ -18,6 +18,8 @@ A aplicação deve parecer um software nativo, respondendo instantaneamente às 
 O projeto utiliza um pipeline avançado para reduzir custos da API do Gemini em até 99%.
 
 - **Conversão Obrigatória (PDF -> MD):** Nunca envie PDFs ou textos brutos densos para a IA. Todo material passa pelo `@pdfme/converter` ou ferramenta similar no servidor e vira Markdown estruturado.
+- **DNA de Conteúdo (Hashing):** Antes de processar ou vetorizar textos, compare o `content_hash` (SHA-256). Se o conteúdo semântico não mudou, o custo deve ser zero.
+- **Resiliência Multi-Modelo:** Para funções críticas (OCR/Chat), implemente fallback automático (ex: Gemini 2.5 Flash -> 1.5 Flash) e retentativas com *exponential backoff* para contornar erros 429 de quota.
 - **RAG Cirúrgico (pgvector):** 
   - Todo Markdown é fatiado via `chunkMarkdown` em pedaços de ~1000 caracteres.
   - Vetorize com `text-embedding-004`.
@@ -26,6 +28,20 @@ O projeto utiliza um pipeline avançado para reduzir custos da API do Gemini em 
   - Antes de gerar uma nova resposta no chat, verifique a tabela `semantic_cache`.
   - Se a similaridade da pergunta atual com uma anterior for **> 0.95**, retorne a resposta salva em banco (Custo 0 tokens).
 - **Extração Estruturada:** Ao extrair dados de editais, use `Gemini 2.5 Flash` com esquemas Zod exigindo saídas estritas em JSON.
+- **Tiptap Markdown Handling:** Sempre que inserir Markdown vindo de IA ou Paste no editor, utilize obrigatoriamente o `editor.markdown.parse(content)` oficial. Isso garante que o motor interno converta os nós corretamente e evita erros de `RangeError` ou perda de formatação visual.
+
+## Fluxo de Verificação Obrigatória
+
+Para garantir a estabilidade e o padrão de excelência, **toda nova implementação ou correção** deve obrigatoriamente seguir este fluxo antes de ser considerada concluída:
+
+1.  **Linting:** Execute `npm run lint` e resolva todos os erros de lógica e avisos críticos. Não ignore erros de `any` ou `hooks` sem justificativa extrema.
+2.  **Testes Unitários:** 
+    *   Verifique se a lógica vital (extrações de IA, cálculos de progresso, ações de banco) possui cobertura em `vitest`.
+    *   Se for uma nova funcionalidade de lógica, crie um arquivo `.test.ts` correspondente.
+    *   Execute `npm test` para garantir que nada foi quebrado.
+3.  **Build Check:** Sempre valide se as mudanças não introduziram erros de tipagem que quebram o build da Vercel (TypeScript).
+
+Siga rigorosamente estas etapas para manter o PLANY no estado da arte.
 
 ---
 

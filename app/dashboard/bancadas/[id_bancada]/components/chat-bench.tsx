@@ -72,7 +72,7 @@ export function ChatBench() {
       }, 2500);
     }
     return () => clearInterval(interval);
-  }, [isLoading]);
+  }, [isLoading, LOADING_MESSAGES.length]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -136,8 +136,13 @@ export function ChatBench() {
 
   useEffect(() => {
     if (externalMessage) {
-      handleSend(externalMessage);
-      setExternalMessage(null);
+      // Usamos setTimeout para desvincular a execução do ciclo de renderização atual
+      // e evitar o aviso de cascading render do React.
+      const timer = setTimeout(() => {
+        handleSend(externalMessage);
+        setExternalMessage(null);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [externalMessage, handleSend, setExternalMessage]);
 

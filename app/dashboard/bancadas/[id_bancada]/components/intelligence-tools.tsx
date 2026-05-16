@@ -223,7 +223,13 @@ export function IntelligenceTools({
                       "w-full h-9 rounded-xl gap-2 text-[10px] font-bold uppercase transition-all duration-300",
                       isEditalConsultantMode ? "bg-primary shadow-lg shadow-primary/20 text-white" : "hover:border-primary/50"
                     )}
-                    onClick={() => setIsEditalConsultantMode(!isEditalConsultantMode)}
+                    onClick={() => {
+                      const nextMode = !isEditalConsultantMode;
+                      setIsEditalConsultantMode(nextMode);
+                      if (nextMode) {
+                        setSelectedContextSubjects([]);
+                      }
+                    }}
                   >
                     <HugeiconsIcon icon={BrainIcon} size={14} />
                     {isEditalConsultantMode ? "Consultor: Ativo" : "Ativar Consultor"}

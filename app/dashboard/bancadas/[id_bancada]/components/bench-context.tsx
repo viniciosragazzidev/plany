@@ -84,13 +84,6 @@ export function BenchProvider({
   const [isEditalConsultantMode, setIsEditalConsultantMode] = useState(false);
   const [externalMessage, setExternalMessage] = useState<string | null>(null);
 
-  // When Consultant Mode is enabled, we clear other context
-  useEffect(() => {
-    if (isEditalConsultantMode) {
-      setSelectedContextSubjects([]);
-    }
-  }, [isEditalConsultantMode]);
-
   // Persistence: Save to localStorage on change
   useEffect(() => {
     localStorage.setItem(`plany_selected_subjects_${benchId}`, JSON.stringify(selectedContextSubjects));
