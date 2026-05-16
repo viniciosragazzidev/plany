@@ -64,7 +64,7 @@ export const AiScannerButton = forwardRef<
           if (result.success) {
             try {
               // Conforme documentação oficial: Usando o MarkdownManager via editor.markdown
-              // @ts-expect-error - editor.markdown é injetado pela extensão mas não está no tipo base
+              // @ts-ignore - editor.markdown é injetado pela extensão mas não está no tipo base
               const markdownManager = editor.markdown
               
               if (markdownManager?.parse) {
@@ -75,7 +75,7 @@ export const AiScannerButton = forwardRef<
                   .focus()
                   .setTextSelection(editor.state.doc.content.size)
                   .insertContent("\n\n") // Garante separação de blocos
-                  .insertContent(jsonContent.content) // Insere apenas o array de conteúdo do objeto 'doc'
+                  .insertContent(jsonContent.content || []) // Garante que nunca seja undefined
                   .run()
               } else {
                 // Fallback: Inserção com contentType (método secundário oficial)
