@@ -19,7 +19,7 @@ O projeto utiliza um pipeline avançado para reduzir custos da API do Gemini em 
 
 - **Conversão Obrigatória (PDF -> MD):** Nunca envie PDFs ou textos brutos densos para a IA. Todo material passa pelo `@pdfme/converter` ou ferramenta similar no servidor e vira Markdown estruturado.
 - **DNA de Conteúdo (Hashing):** Antes de processar ou vetorizar textos, compare o `content_hash` (SHA-256). Se o conteúdo semântico não mudou, o custo deve ser zero.
-- **Resiliência Multi-Modelo:** Para funções críticas (OCR/Chat), implemente fallback automático (ex: Gemini 2.5 Flash -> 1.5 Flash) e retentativas com *exponential backoff* para contornar erros 429 de quota.
+- **Resiliência Multi-Modelo:** Para funções críticas (OCR/Chat), implemente fallback automático (ex: Gemini 2.5 Flash) e retentativas com *exponential backoff* para contornar erros 429 de quota.
 - **RAG Cirúrgico (pgvector):** 
   - Todo Markdown é fatiado via `chunkMarkdown` em pedaços de ~1000 caracteres.
   - Vetorize com `text-embedding-004`.

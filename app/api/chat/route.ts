@@ -119,10 +119,10 @@ Objetivo: ${bench.goalName}`;
     }));
 
     // Encontra o índice da primeira mensagem de usuário
-    const firstUserIndex = rawHistory.findIndex(m => m.role === "user");
+    const firstUserIndex = rawHistory.findIndex((m: any) => m.role === "user");
     const history = firstUserIndex !== -1 ? rawHistory.slice(firstUserIndex) : [];
 
-    const models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5"];
+    const models = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
     let resultText = "";
     let lastError: any;
 
