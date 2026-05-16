@@ -16,8 +16,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import ReactMarkdown from "react-markdown";
 import { TypewriterMarkdown } from "./typewriter-markdown";
+import { ClickableMarkdown } from "./clickable-markdown";
 import { useBench } from "./bench-context";
 import { Badge } from "@/components/ui/badge";
 import { SkeletonSync } from "@/components/ui/skeleton-sync";
@@ -216,9 +216,7 @@ export function ChatBench() {
                           prose-strong:text-foreground prose-strong:font-bold
                           prose-ul:list-disc prose-ul:pl-4 prose-ol:list-decimal prose-ol:pl-4
                           prose-li:my-1 prose-a:text-primary prose-a:underline">
-                        <ReactMarkdown>
-                          {msg.content}
-                        </ReactMarkdown>
+                        <ClickableMarkdown content={msg.content} />
                       </div>
                     )
                   ) : (

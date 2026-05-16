@@ -1,49 +1,39 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const apiKey = process.env.GEMINI_API_KEY;
-// Instancia o cliente oficial do novo SDK do Gemini
-const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+const genAI = new GoogleGenerativeAI(apiKey || "");
 
 /**
  * Gera embeddings para um texto usando o modelo de embedding do Gemini.
- * Inclui uma lógica simples de retry para lidar com limites de quota (429).
+ * Inclui lógica de retry e fallback silencioso se todos os modelos falharem.
  */
-export async function getEmbedding(text: string, maxRetries = 2): Promise<number[]> {
-  let lastError: any;
-  
-  const models = ["text-embedding-004", "embedding-001"];
+export async function getEmbedding(text: string, maxRetries = 1): Promise<number[] | null> {
+  const models = ["text-embedding-004"];
   
   for (const modelName of models) {
+    const model = genAI.getGenerativeModel({ model: modelName });
+    
     for (let i = 0; i <= maxRetries; i++) {
       try {
-        const response = await ai.models.embedContent({
-          model: modelName,
-          contents: text, 
-        });
+        const result = await model.embedContent(text);
+        const values = result.embedding.values;
         
-        const values = response.embeddings?.[0]?.values;
-        if (!values) throw new Error("Falha ao obter embeddings do Gemini");
-        
-        return values;
+        if (values) return values;
       } catch (error: any) {
-        lastError = error;
-        // Se for erro de quota (429), espera um pouco antes de tentar de novo
+        // Erro de Quota (429): Espera curta e tenta de novo se houver retentativas
         if (error.status === 429 && i < maxRetries) {
-          const delay = Math.pow(2, i) * 1000;
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise(resolve => setTimeout(resolve, 2000));
           continue;
         }
-        // Se for 404, tenta o próximo modelo
-        if (error.status === 404) {
-          break;
-        }
-        break; 
+
+        // Se o modelo não existir ou houver outro erro, tenta o próximo modelo da lista
+        break;
       }
     }
   }
   
-  console.error("Erro ao gerar embedding após retentativas:", lastError);
-  throw lastError;
+  console.warn("[Embedding] Não foi possível gerar vetores. Buscas semânticas desativadas temporariamente.");
+  return null;
 }
 
 

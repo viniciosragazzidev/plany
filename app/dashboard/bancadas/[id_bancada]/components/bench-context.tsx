@@ -35,6 +35,7 @@ interface BenchContextType {
   setIsEditalConsultantMode: (is: boolean) => void;
   externalMessage: string | null;
   setExternalMessage: (msg: string | null) => void;
+  editalItems: { id: string; category: string; topic: string; isCovered: boolean }[];
 }
 
 const BenchContext = createContext<BenchContextType | undefined>(undefined);
@@ -46,12 +47,14 @@ export function BenchProvider({
     children, 
     initialSubjects,
     benchId,
-    initialResearchStatus = "idle"
+    initialResearchStatus = "idle",
+    editalItems = []
 }: { 
     children: React.ReactNode; 
     initialSubjects: string[];
     benchId: string;
     initialResearchStatus?: string;
+    editalItems?: { id: string; category: string; topic: string; isCovered: boolean }[];
 }) {
   const [selectedContextSubjects, setSelectedContextSubjects] = useState<string[]>(() => {
     if (typeof window !== "undefined") {
@@ -173,7 +176,8 @@ export function BenchProvider({
       isEditalConsultantMode,
       setIsEditalConsultantMode,
       externalMessage,
-      setExternalMessage
+      setExternalMessage,
+      editalItems
     }}>
       {children}
     </BenchContext.Provider>

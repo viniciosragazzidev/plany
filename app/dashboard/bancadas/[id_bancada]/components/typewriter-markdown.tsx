@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { ClickableMarkdown } from "./clickable-markdown";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { FastForward } from "@hugeicons/core-free-icons";
@@ -58,9 +58,7 @@ export function TypewriterMarkdown({
   return (
     <div className="relative group/typewriter">
       <div className={className}>
-        <ReactMarkdown>
-          {displayedContent}
-        </ReactMarkdown>
+        <ClickableMarkdown content={displayedContent} />
       </div>
       {!isFinished && displayedContent.length > 50 && (
         <Button 

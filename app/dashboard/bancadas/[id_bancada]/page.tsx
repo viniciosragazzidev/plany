@@ -76,6 +76,7 @@ export default async function BenchDetailPage({
       initialSubjects={benchSubjects.map(s => s.id)} 
       benchId={bench.id} 
       initialResearchStatus={bench.researchStatus}
+      editalItems={items as any}
     >
       <div className="flex flex-col h-screen bg-background overflow-hidden font-sans">
         {/* Top Header */}
