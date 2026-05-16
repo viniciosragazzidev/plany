@@ -21,7 +21,7 @@ export async function getEmbedding(text: string, maxRetries = 1): Promise<number
     for (let i = 0; i <= maxRetries; i++) {
       try {
         const result = await model.embedContent({
-          content: { parts: [{ text: text.substring(0, 30000) }] },
+          content: { role: 'user', parts: [{ text: text.substring(0, 30000) }] },
           // @ts-ignore
           outputDimensionality: 768
         });

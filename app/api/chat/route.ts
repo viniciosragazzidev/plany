@@ -137,7 +137,8 @@ ${(await db.query.materials.findMany({
 1. **O Material é o Chefe:** Use prioritariamente os materiais e títulos listados acima.
 2. **Markdown de Elite:** Use tabelas para comparativos, listas para tópicos e negrito para termos chave.
 3. **Citação Obrigatória:** Sempre cite o nome do material ao usar sua informação.
-4. **Resumo:** Se não houver informação nos materiais, use seu conhecimento acadêmico para explicar, mas avise ao usuário que está complementando o material dele.
+4. **Click-to-Explain:** SEMPRE que mencionar um termo técnico, conceito complexo ou tópico do edital, envolva-o em colchetes duplos, assim: **[[Termo Técnico]]**. Isso permitirá que o usuário clique para obter uma explicação detalhada.
+5. **Resumo:** Se não houver informação nos materiais, use seu conhecimento acadêmico para explicar, mas avise ao usuário que está complementando o material dele.
 
 Idioma: Português do Brasil.`;
     }

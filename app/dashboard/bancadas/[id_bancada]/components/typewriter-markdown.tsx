@@ -11,13 +11,15 @@ interface TypewriterMarkdownProps {
   speed?: number;
   onComplete?: () => void;
   className?: string;
+  isLoading?: boolean;
 }
 
 export function TypewriterMarkdown({ 
   content, 
   speed = 5, 
   onComplete,
-  className 
+  className,
+  isLoading
 }: TypewriterMarkdownProps) {
   const [displayedContent, setDisplayedContent] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -58,7 +60,7 @@ export function TypewriterMarkdown({
   return (
     <div className="relative group/typewriter">
       <div className={className}>
-        <ClickableMarkdown content={displayedContent} />
+        <ClickableMarkdown content={displayedContent} isLoading={isLoading} />
       </div>
       {!isFinished && displayedContent.length > 50 && (
         <Button 

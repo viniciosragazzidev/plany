@@ -202,6 +202,7 @@ export function ChatBench() {
                       <TypewriterMarkdown 
                         content={msg.content} 
                         speed={3} 
+                        isLoading={isLoading}
                         className="prose prose-sm dark:prose-invert max-w-none 
                           prose-p:leading-relaxed prose-pre:bg-secondary/20 prose-pre:p-3 prose-pre:rounded-xl
                           prose-code:bg-primary/10 prose-code:text-primary prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none
@@ -216,7 +217,7 @@ export function ChatBench() {
                           prose-strong:text-foreground prose-strong:font-bold
                           prose-ul:list-disc prose-ul:pl-4 prose-ol:list-decimal prose-ol:pl-4
                           prose-li:my-1 prose-a:text-primary prose-a:underline">
-                        <ClickableMarkdown content={msg.content} />
+                        <ClickableMarkdown content={msg.content} isLoading={isLoading} />
                       </div>
                     )
                   ) : (

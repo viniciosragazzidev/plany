@@ -139,7 +139,7 @@ export async function updateAnotacaoContent(materialId: string, content: string,
                 const chunks = chunkMarkdown(plainText);
                 
                 try {
-                    const newChunks = [];
+                    const newChunks: { materialId: string; content: string; embedding: number[] }[] = [];
                     for (const chunk of chunks) {
                         const embedding = await getEmbedding(chunk);
                         if (embedding) {
