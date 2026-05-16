@@ -38,6 +38,7 @@ import "@/components/tiptap-node/paragraph-node/paragraph-node.scss"
 // --- Tiptap UI ---
 import { HeadingDropdownMenu } from "@/components/tiptap-ui/heading-dropdown-menu"
 import { ImageUploadButton } from "@/components/tiptap-ui/image-upload-button"
+import { AiScannerButton } from "@/components/tiptap-ui/ai-scanner-button"
 import { ListDropdownMenu } from "@/components/tiptap-ui/list-dropdown-menu"
 import { BlockquoteButton } from "@/components/tiptap-ui/blockquote-button"
 import { CodeBlockButton } from "@/components/tiptap-ui/code-block-button"
@@ -140,6 +141,7 @@ const MainToolbarContent = ({
 
       <ToolbarGroup>
         <ImageUploadButton text="Add" />
+        <AiScannerButton />
       </ToolbarGroup>
 
       <Spacer />
@@ -212,6 +214,16 @@ export function SimpleEditor({ initialContent, onChange }: SimpleEditorProps) {
         "aria-label": "Main content area, start typing to enter text.",
         class: "simple-editor",
       },
+      handlePaste: (view, event) => {
+        const text = event.clipboardData?.getData("text/plain")
+        if (!text || !editor) return false
+
+        // Intercepta o paste e força o parsing como Markdown
+        editor.commands.insertContent(text, {
+          contentType: "markdown",
+        })
+        return true
+      },
     },
     extensions: [
       StarterKit.configure({
@@ -253,7 +265,10 @@ export function SimpleEditor({ initialContent, onChange }: SimpleEditorProps) {
   // Update content if initialContent changes (e.g. when switching notes)
   useEffect(() => {
     if (editor && initialContent !== undefined && initialContent !== editor.getMarkdown()) {
-      editor.commands.setContent(initialContent, { emitUpdate: false });
+      editor.commands.setContent(initialContent, { 
+        emitUpdate: false,
+        contentType: "markdown" 
+      });
     }
   }, [initialContent, editor]);
 

@@ -131,6 +131,7 @@ export const materials = pgTable("materials", {
   type: materialTypeEnum("type").notNull(),
   storageUrl: text("storage_url"),
   content: text("content"), // Markdown or plain text
+  contentHash: text("content_hash"), // To avoid redundant vectorization
   isPinned: boolean("is_pinned").default(false).notNull(),
   contentVectorRef: text("content_vector_ref"), // Placeholder for future vector DB integration
   createdAt: timestamp("created_at").defaultNow().notNull(),

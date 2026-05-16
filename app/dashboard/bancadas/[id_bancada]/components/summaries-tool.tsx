@@ -89,7 +89,10 @@ export function SummariesTool({ benchId, subjects, materials }: SummariesToolPro
   const loadSummaries = async () => {
     setIsLoading(true);
     try {
-      const res = await getSummariesAction(benchId);
+      const subjectId = subjects.length > 0 ? subjects[0].id : null;
+      if (!subjectId) return;
+
+      const res = await getSummariesAction(benchId, subjectId);
       if (res.success) {
         setSummariesList(res.summaries || []);
       }

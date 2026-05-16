@@ -6,23 +6,44 @@ const ai = new GoogleGenAI({ apiKey: apiKey || "" });
 
 /**
  * Gera embeddings para um texto usando o modelo de embedding do Gemini.
+ * Inclui uma lógica simples de retry para lidar com limites de quota (429).
  */
-export async function getEmbedding(text: string): Promise<number[]> {
-  try {
-    const response = await ai.models.embedContent({
-      model: "gemini-embedding-001",
-      contents: text, 
-    });
-    
-    // CORREÇÃO: O SDK oficial @google/genai retorna um array dentro de 'embeddings'
-    const values = response.embeddings?.[0]?.values;
-    if (!values) throw new Error("Falha ao obter embeddings do Gemini");
-    
-    return values;
-  } catch (error) {
-    console.error("Erro ao gerar embedding:", error);
-    throw error;
+export async function getEmbedding(text: string, maxRetries = 2): Promise<number[]> {
+  let lastError: any;
+  
+  const models = ["text-embedding-004", "embedding-001"];
+  
+  for (const modelName of models) {
+    for (let i = 0; i <= maxRetries; i++) {
+      try {
+        const response = await ai.models.embedContent({
+          model: modelName,
+          contents: text, 
+        });
+        
+        const values = response.embeddings?.[0]?.values;
+        if (!values) throw new Error("Falha ao obter embeddings do Gemini");
+        
+        return values;
+      } catch (error: any) {
+        lastError = error;
+        // Se for erro de quota (429), espera um pouco antes de tentar de novo
+        if (error.status === 429 && i < maxRetries) {
+          const delay = Math.pow(2, i) * 1000;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        // Se for 404, tenta o próximo modelo
+        if (error.status === 404) {
+          break;
+        }
+        break; 
+      }
+    }
   }
+  
+  console.error("Erro ao gerar embedding após retentativas:", lastError);
+  throw lastError;
 }
 
 

@@ -6,6 +6,7 @@ import { eq, and, desc, inArray } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { createHash } from "crypto";
 
 export async function getCadernosSidebarData() {
   try {
@@ -78,18 +79,17 @@ export async function updateAnotacaoContent(materialId: string, content: string,
         const dataToUpdate: any = { content };
         if (title) dataToUpdate.title = title;
 
-        const [material] = await db.update(materials)
-            .set(dataToUpdate)
-            .where(eq(materials.id, materialId))
-            .returning();
+        // 1. Get current material to check hash
+        const currentMaterial = await db.query.materials.findFirst({
+            where: eq(materials.id, materialId)
+        });
 
-        // Extrair texto legível para vetorização (suporta HTML do Tiptap e Fallback)
+        // 2. Extrair texto legível para vetorização
         let plainText = "";
         try {
             if (content.trim().startsWith("[") || content.trim().startsWith("{")) {
                 const parsed = JSON.parse(content);
                 if (Array.isArray(parsed)) {
-                    // Legado BlockNote
                     plainText = parsed.map((b: any) => {
                         if (b.content && Array.isArray(b.content)) {
                             return b.content.map((t: any) => t.text || "").join(" ");
@@ -100,37 +100,69 @@ export async function updateAnotacaoContent(materialId: string, content: string,
                     plainText = content.replace(/<[^>]*>/g, " ");
                 }
             } else {
-                // Tiptap HTML
                 plainText = content.replace(/<[^>]*>/g, " ");
             }
         } catch (e) {
-            plainText = content.replace(/<[^>]*>/g, " "); // Fallback
+            plainText = content.replace(/<[^>]*>/g, " ");
         }
 
-        if (plainText.trim().length > 0) {
-            // Deleta chunks antigos
-            await db.delete(materialChunks).where(eq(materialChunks.materialId, materialId));
+        const newHash = createHash("sha256").update(plainText).digest("hex");
+        
+        // 3. Only update and re-vectorize if hash changed
+        if (currentMaterial?.contentHash !== newHash) {
+            dataToUpdate.contentHash = newHash;
             
-            // Fatiamento e Vetorização em background (não precisa bloquear a UI, mas aqui aguardamos por simplicidade do MVP)
-            const { chunkMarkdown, getEmbedding } = await import("@/lib/ai-optimizations");
-            const chunks = chunkMarkdown(plainText);
-            
-            for (const chunk of chunks) {
+            const [material] = await db.update(materials)
+                .set(dataToUpdate)
+                .where(eq(materials.id, materialId))
+                .returning();
+
+            if (plainText.trim().length > 0) {
+                // Fatiamento e Vetorização
+                const { chunkMarkdown, getEmbedding } = await import("@/lib/ai-optimizations");
+                const chunks = chunkMarkdown(plainText);
+                
+                // Limpa chunks antigos APENAS se formos gerar novos com sucesso
+                // Para simplificar o MVP e evitar inconsistência por 429, 
+                // vamos tentar vetorizar e só se não der erro crítico limpamos os antigos.
+                // Mas o padrão atual é deletar e reinserir.
+                
                 try {
-                    const embedding = await getEmbedding(chunk);
-                    await db.insert(materialChunks).values({
-                        materialId,
-                        content: chunk,
-                        embedding
-                    });
-                } catch (err) {
-                    console.error("Erro ao vetorizar anotação:", err);
+                    const newChunks = [];
+                    for (const chunk of chunks) {
+                        const embedding = await getEmbedding(chunk);
+                        newChunks.push({
+                            materialId,
+                            content: chunk,
+                            embedding
+                        });
+                    }
+                    
+                    // Se chegou aqui sem erro de quota, podemos atualizar o banco
+                    await db.delete(materialChunks).where(eq(materialChunks.materialId, materialId));
+                    for (const nc of newChunks) {
+                        await db.insert(materialChunks).values(nc);
+                    }
+                } catch (err: any) {
+                    console.error("Erro ao vetorizar anotação (Quota ou API):", err);
+                    // Se for erro de quota (429), apenas logamos e mantemos os chunks antigos
+                    // ou o estado atual sem novos chunks. O importante é não quebrar o save do texto.
                 }
             }
+
+            revalidatePath("/dashboard/cadernos");
+            return { success: true, anotacao: material };
+        } else if (title && currentMaterial.title !== title) {
+            // Só título mudou
+            const [material] = await db.update(materials)
+                .set({ title })
+                .where(eq(materials.id, materialId))
+                .returning();
+            revalidatePath("/dashboard/cadernos");
+            return { success: true, anotacao: material };
         }
 
-        revalidatePath("/dashboard/cadernos");
-        return { success: true, anotacao: material };
+        return { success: true };
     } catch (error: any) {
         console.error("Erro ao atualizar anotação:", error);
         return { success: false, error: error.message };

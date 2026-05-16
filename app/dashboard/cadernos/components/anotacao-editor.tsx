@@ -34,7 +34,7 @@ export function AnotacaoEditor({ anotacao }: AnotacaoEditorProps) {
     () =>
       debounce(async (id: string, content: string, title: string) => {
         await updateAnotacaoContent(id, content, title);
-      }, 1500),
+      }, 3000),
     []
   );
 
