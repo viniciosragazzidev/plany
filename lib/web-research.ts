@@ -64,8 +64,9 @@ Exemplo de formato:
  */
 export async function beautifyMaterialTitle(rawTitle: string, topic: string): Promise<string> {
   try {
-    const model = ai.models.getGenerativeModel({ model: "gemini-2.5-flash" });
-    const prompt = `Você é um Curador de Conteúdo Acadêmico. 
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: `Você é um Curador de Conteúdo Acadêmico. 
 Sua tarefa é limpar e transformar um título de arquivo/página web em um título elegante, profissional e direto para um material de estudo.
 
 Tópico do Assunto: ${topic}
@@ -77,10 +78,9 @@ Regras:
 - Capitalize corretamente (Iniciais em Maiúsculo)
 - Mantenha o título curto e focado no conteúdo (máx 60 caracteres)
 - Se o título for irrelevante ou apenas código, gere um título novo baseado no tópico.
-- Retorne APENAS o novo título, sem explicações.`;
-
-    const result = await model.generateContent(prompt);
-    return result.response.text().trim() || rawTitle;
+- Retorne APENAS o novo título, sem explicações.` }] }],
+    });
+    return response.text?.trim() || rawTitle;
   } catch (error) {
     console.error("[AI-Beautify] Erro ao embelezar título:", error);
     return rawTitle;
