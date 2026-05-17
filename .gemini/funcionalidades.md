@@ -33,52 +33,62 @@ Responsável por garantir que bancadas sem editais cadastrados possam ter suas e
 
 *   **O que faz por baixo dos panos:**
     1.  Valida se a bancada já possui matérias e tópicos estruturados ou se tem um edital pendente usando [validateGarimpoState](file:///c:/Users/kyper/Desktop/Projects/plany/lib/actions/garimpo.ts#L23).
-    2.  Pesquisa no Google (Dorks exaustivos) usando scraper web.
+    2.  Pesquisa no Google utilizando técnicas de dorking exaustivo com exclusões inteligentes de páginas puras de grades de cursos (`-ementa -currículo -curriculo -bimestre`) para rejeitar ementas vazias.
     3.  A IA analisa o contexto coletado e o nome do objetivo do aluno e gera uma lista refinada de disciplinas e tópicos usando [researchEmptyEditalTopics](file:///c:/Users/kyper/Desktop/Projects/plany/lib/web-research.ts#L74).
     4.  Oferece os tópicos sugeridos para o usuário marcar e confirma a criação rápida em massa com [bulkCreateTopicsAction](file:///c:/Users/kyper/Desktop/Projects/plany/lib/actions/garimpo.ts#L198).
 
 *   **Exemplo de Uso pelo Cliente:**
-    O usuário cria uma bancada "Concurso Caixa - T.I." mas não tem o arquivo PDF em mãos. Ele clica em **"Garimpar Ementa"**. O sistema faz uma pesquisa automatizada na web, localiza o conteúdo programático mais recente do concurso Caixa, e exibe uma lista de caixas de seleção com disciplinas como *Banco de Dados* e *Estruturas de Dados*. O usuário seleciona quais quer estudar e clica em "Salvar".
+    O usuário cria uma bancada "Concurso Caixa - T.I." mas não tem o arquivo PDF em mãos. Ele clica em **"Garimpar Ementa"**. O sistema faz uma pesquisa automatizada na web, descarta cronogramas escolares vazios através de filtros de autoridade de raspagem e dorks cirúrgicos, e exibe as disciplinas reais.
 
 *   **Referências de Código:**
     *   Camada de Orquestração: [garimpo.ts](file:///c:/Users/kyper/Desktop/Projects/plany/lib/actions/garimpo.ts)
     *   Algoritmos de Pesquisa de Ementas: [web-research.ts](file:///c:/Users/kyper/Desktop/Projects/plany/lib/web-research.ts)
+    *   Filtros e Pontuação do Scraper: [web-scraper.ts](file:///c:/Users/kyper/Desktop/Projects/plany/lib/web-scraper.ts)
 
 ---
 
 ## 3. Módulo: Adição & Vetorização de Materiais de Estudo
 
-Permite adicionar documentos em texto, links externos ou PDFs que servirão de base para o estudo da disciplina selecionada, automatizando o pipeline de vetorização para uso em RAG.
+Permite adicionar documentos em texto, links externos ou PDFs que servirão de base para o estudo da disciplina selecionada, automatizando o pipeline de vetorização para uso em RAG com barreira rígida contra duplicatas de links.
 
 *   **O que faz por baixo dos panos:**
-    1.  Caso o material seja PDF, extrai e sanitiza o texto localmente.
-    2.  O texto é fatiado inteligentemente por cabeçalhos usando [chunkMarkdown](file:///c:/Users/kyper/Desktop/Projects/plany/lib/ai-optimizations.ts#L16).
-    3.  Gera embeddings vetoriais com o modelo `gemini-embedding-2` usando [generateEmbedding](file:///c:/Users/kyper/Desktop/Projects/plany/lib/ai-service.ts#L110).
-    4.  Classifica cada trecho de texto por tag semântica ("Dica", "Exemplo", "Lei", "Macete") em [classifyChunk](file:///c:/Users/kyper/Desktop/Projects/plany/lib/ai-optimizations.ts#L57) para consultas contextuais precisas.
-    5.  Salva os dados nas tabelas `materials` e `materialChunks`.
+    1.  Valida se a URL ou material já foi importado para aquela bancada específica antes de iniciar o processamento, bloqueando importações repetidas.
+    2.  Caso o material seja PDF, extrai e sanitiza o texto localmente.
+    3.  O texto é fatiado inteligentemente por cabeçalhos usando [chunkMarkdown](file:///c:/Users/kyper/Desktop/Projects/plany/lib/ai-optimizations.ts#L16).
+    4.  Gera embeddings vetoriais com o modelo `gemini-embedding-2` usando [generateEmbedding](file:///c:/Users/kyper/Desktop/Projects/plany/lib/ai-service.ts#L110).
+    5.  Classifica cada trecho de texto por tag semântica ("Dica", "Exemplo", "Lei", "Macete") em [classifyChunk](file:///c:/Users/kyper/Desktop/Projects/plany/lib/ai-optimizations.ts#L57) para consultas contextuais precisas.
+    6.  Salva os dados nas tabelas `materials` e `materialChunks`.
+    7.  Oferece o visualizador unificado premium `ViewMaterialDialog` em [view-material-dialog.tsx](file:///c:/Users/kyper/Desktop/Projects/plany/app/dashboard/bancadas/[id_bancada]/components/view-material-dialog.tsx) com suporte a rolagem nativa de scroll-y para qualquer tipo de material (`link`, `pdf`, `text`, `anotacao`).
 
 *   **Exemplo de Uso pelo Cliente:**
-    O aluno envia o arquivo de slides `Aula_01_Atos_Administrativos.pdf` para a disciplina de *Direito Administrativo*. Após o upload, um glow azul pisca ao lado do arquivo indicando que ele foi "Vetorizado e Memorizado". A partir desse momento, qualquer dúvida tirada no Chat utilizará o conteúdo desse arquivo como contexto.
+    O aluno envia o link de um artigo sobre Atos Administrativos. Se o link já estiver inserido, o sistema impede a duplicidade. Se for novo, memoriza vetorialmente e o disponibiliza para estudo em um modal premium fluído de leitura em Markdown com botão de cópia de conteúdo e link direto do original.
 
 *   **Referências de Código:**
     *   Server Action de Ingestão: [addMaterial](file:///c:/Users/kyper/Desktop/Projects/plany/lib/actions/bench.ts#L270)
+    *   Action de Ingestão Web: [ingestWebMaterialAction](file:///c:/Users/kyper/Desktop/Projects/plany/lib/actions/materials.ts)
+    *   Visualizador Unificado Premium: [view-material-dialog.tsx](file:///c:/Users/kyper/Desktop/Projects/plany/app/dashboard/bancadas/[id_bancada]/components/view-material-dialog.tsx)
     *   Serviço de IA de Vetorização: [ai-optimizations.ts](file:///c:/Users/kyper/Desktop/Projects/plany/lib/ai-optimizations.ts)
 
 ---
 
 ## 4. Módulo: Cadernos Rich-Text Inteligentes (TipTap Notes)
 
-O espaço pessoal de anotações do estudante, integrado diretamente com a inteligência do sistema.
+O espaço pessoal de anotações do estudante, integrado diretamente com a inteligência do sistema e acessível de forma otimizada.
 
 *   **O que faz por baixo dos panos:**
     1.  Armazena as anotações do editor rich-text em banco de dados (`materials` com o tipo `anotacao`).
     2.  O texto em JSON emitido pelo TipTap é processado e agrupado em blocos inteligentes estruturados de cabeçalho e tamanho usando [updateAnotacaoContent](file:///c:/Users/kyper/Desktop/Projects/plany/lib/actions/cadernos.ts#L80).
     3.  Atualiza os chunks vetoriais do caderno a cada alteração de conteúdo (apenas se houver mudança de SHA-256 no hash do texto), garantindo RAG sempre atualizado em background.
+    4.  **Criação Rápida de Matérias pela Sidebar:** Permite criar matérias e disciplinas diretamente no cabeçalho das bancadas na barra lateral de cadernos usando o botão `+`, integrando-se à Zustand store via [addSubjectLocal](file:///c:/Users/kyper/Desktop/Projects/plany/hooks/use-cadernos.ts#L55) para atualização otimista na tela (0ms).
+    5.  **Atalho Direto para Bancada:** Disponibiliza o botão premium **"Ir para a Bancada"** (`ArrowRight01Icon`) no cabeçalho de visualização/edição de cadernos para navegação rápida de volta ao hub de estudos original daquela anotação.
 
 *   **Exemplo de Uso pelo Cliente:**
-    O aluno abre o **Caderno de Estudos** de *Língua Portuguesa*, digita suas próprias anotações sobre sintaxe e formata em títulos e listas. Enquanto ele escreve, o sistema vetoriza suas anotações no banco, integrando o próprio resumo do estudante às bases de conhecimento que o chatbot lê.
+    O aluno abre o **Caderno de Estudos** e digita suas anotações. Ele percebe que sua bancada está vazia de matérias e, sem sair do módulo, clica no **`+`** na sidebar, adiciona "História" com a cor laranja, e a disciplina surge na tela na hora! Ao terminar de anotar, ele clica em "Ir para a Bancada" no cabeçalho para voltar ao hub e iniciar um simulado.
 
 *   **Referências de Código:**
+    *   Interface de Usuário da Sidebar: [sidebar-cadernos.tsx](file:///c:/Users/kyper/Desktop/Projects/plany/app/dashboard/cadernos/components/sidebar-cadernos.tsx)
+    *   Editor e Atalho de Navegação: [anotacao-editor.tsx](file:///c:/Users/kyper/Desktop/Projects/plany/app/dashboard/cadernos/components/anotacao-editor.tsx)
+    *   Página de Anotação Individual: [page.tsx](file:///c:/Users/kyper/Desktop/Projects/plany/app/dashboard/cadernos/[id_anotacao]/page.tsx)
     *   Server Action de Persistência & Vetorização de Notas: [cadernos.ts](file:///c:/Users/kyper/Desktop/Projects/plany/lib/actions/cadernos.ts)
 
 ---
@@ -94,7 +104,7 @@ Sistema de memorização por repetição espaçada integrado ao conteúdo dos ma
     4.  Entrega para estudo os flashcards que venceram o tempo de intervalo em [getFlashcardsForReviewAction](file:///c:/Users/kyper/Desktop/Projects/plany/lib/actions/flashcards.ts#L186).
 
 *   **Exemplo de Uso pelo Cliente:**
-    O estudante escolhe a disciplina *Matemática* e clica em **"Gerar Flashcards"**. A IA cria 10 cartões (Ex: Front: "Qual a fórmula da progressão aritmética?", Back: "an = a1 + (n-1)*r"). Ele treina e marca que o cartão foi "Fácil" (nota 5). O sistema agenda a reapresentação do cartão para dali a 6 dias. Outro cartão marcado como "Esqueci" (nota 1) volta para a pilha para ser revisado no dia seguinte.
+    O estudante escolhe a disciplina *Matemática* e clica em **"Gerar Flashcards"**. A IA cria 10 cartões. Ele treina e marca que o cartão foi "Fácil" (nota 5). O sistema agenda a reapresentação do cartão para dali a 6 dias. Outro cartão marcado como "Esqueci" (nota 1) volta para a pilha para ser revisado no dia seguinte.
 
 *   **Referências de Código:**
     *   Server Actions e Motor SM-2: [flashcards.ts](file:///c:/Users/kyper/Desktop/Projects/plany/lib/actions/flashcards.ts)
@@ -130,7 +140,7 @@ Funcionalidade que permite condensar múltiplos PDFs e anotações densas em res
     4.  Permite o salvamento físico no banco (`summaries`) e a exportação direta para o caderno em formato Markdown usando [exportSummaryToNotebookAction](file:///c:/Users/kyper/Desktop/Projects/plany/lib/actions/summaries.ts#L143).
 
 *   **Exemplo de Uso pelo Cliente:**
-    O aluno seleciona dois capítulos gigantescos de economia em PDF e clica em **"Gerar Resumo"**. O sistema entrega um layout interativo de cards estruturados explicando conceitos difíceis. Para o conceito de "Inflação", exibe a analogia: *"Imagine que a inflação é como colocar fermento demais em um bolo de aniversário: a massa cresce muito, mas o sabor continua sendo para o mesmo número de convidados..."*. O aluno clica em "Salvar no Caderno" e o resumo vira uma nota editável.
+    O aluno seleciona dois capítulos gigantescos de economia em PDF e clica em **"Gerar Resumo"**. O sistema entrega um layout interativo de cards estruturados explicando conceitos difíceis. Para o conceito de "Inflação", exibe a analogia: *"Imagine que a inflação é como colocar fermento demais em um bolo de aniversário..."*. O aluno clica em "Salvar no Caderno" e o resumo vira uma nota editável.
 
 *   **Referências de Código:**
     *   Server Action de Resumos: [summaries.ts](file:///c:/Users/kyper/Desktop/Projects/plany/lib/actions/summaries.ts)
@@ -192,4 +202,25 @@ Módulo central de gestão de perfil e preferências de interface, permitindo qu
     *   Esquema de Dados: [userSettings](file:///c:/Users/kyper/Desktop/Projects/plany/lib/db/schema.ts)
 
 ---
-*Este mapa operacional foi estruturado em 17 de Maio de 2026 para documentar detalhadamente todas as pontas do ecossistema de funcionalidades do PLANY.*
+
+## 11. Módulo: Cobrança, Assinatura & Controle de Acesso (Billing)
+
+Infraestrutura comercial e de features gates adormecida, pronta para cobrança de planos do PLANY mantendo bypass temporário de testes.
+
+*   **O que faz por baixo dos panos:**
+    1.  Armazena o status da assinatura do usuário na tabela `subscriptions` vinculada via Drizzle.
+    2.  **Gatekeeper de Permissões (`checkFeatureAccess`):** Centraliza as travas comerciais baseando-se no tier do usuário (`free`, `premium`, `master`) e na flag global de ambiente `ENABLE_PAYWALLS` (retorna sempre `true` por padrão no bypass para desenvolvedores).
+    3.  **Webhook de Faturamento:** Endpoint passivo de recepção de eventos de pagamento em [route.ts](file:///c:/Users/kyper/Desktop/Projects/plany/app/api/webhooks/billing/route.ts) preparado para ouvir callbacks criptográficos e registrar em log.
+    4.  **Interface de Assinatura:** Aba estruturada "Assinatura" (`CreditCardIcon`) integrada nas configurações exibindo o status de acesso vitalício em desenvolvimento.
+
+*   **Exemplo de Uso pelo Cliente:**
+    O administrador ou testador acessa "Configurações > Assinatura" e visualiza seu plano ativo temporário como "Desenvolvedor / Acesso Total Vitalício". Quando os paywalls forem ativados via `.env`, o sistema checará as cotas em tempo real por usuário através do `subscription-guard.ts`.
+
+*   **Referências de Código:**
+    *   Tabela de Cobrança: [subscriptions](file:///c:/Users/kyper/Desktop/Projects/plany/lib/db/schema.ts#L346)
+    *   Validador de Acesso: [subscription-guard.ts](file:///c:/Users/kyper/Desktop/Projects/plany/lib/utils/subscription-guard.ts)
+    *   Webhook de Pagamento: [route.ts](file:///c:/Users/kyper/Desktop/Projects/plany/app/api/webhooks/billing/route.ts)
+    *   Aba Visual de Cobrança: [settings-form.tsx](file:///c:/Users/kyper/Desktop/Projects/plany/app/dashboard/settings/components/settings-form.tsx#L351)
+
+---
+*Este mapa operacional foi atualizado em 17 de Maio de 2026 para documentar detalhadamente todas as pontas do ecossistema de funcionalidades do PLANY.*
