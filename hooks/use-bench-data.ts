@@ -93,7 +93,13 @@ export function useBenchData(benchId: string) {
   })
 
   const addMaterialMutation = useMutation({
-    mutationFn: (formData: FormData) => addMaterialAction(formData),
+    mutationFn: async (formData: FormData) => {
+      const res = await addMaterialAction(formData);
+      if (!res.success) {
+        throw new Error(res.message || res.error || 'Erro ao adicionar material');
+      }
+      return res.data;
+    },
     onMutate: async (formData) => {
       await queryClient.cancelQueries({ queryKey: ['bench-materials', benchId] })
       const previousMaterials = queryClient.getQueryData(['bench-materials', benchId])
@@ -116,9 +122,9 @@ export function useBenchData(benchId: string) {
 
       return { previousMaterials }
     },
-    onError: (err, variables, context) => {
+    onError: (err: any, variables, context) => {
       queryClient.setQueryData(['bench-materials', benchId], context?.previousMaterials)
-      toast.error('Ops! O material se perdeu no caminho. A rede falhou, tenta subir ele de novo?')
+      toast.error(err.message || 'Ops! O material se perdeu no caminho. A rede falhou, tenta subir ele de novo?')
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['bench-materials', benchId] })

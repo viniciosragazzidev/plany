@@ -391,6 +391,9 @@ export async function addMaterial(formData: FormData): Promise<ActionResponse<{ 
     return actionSuccess({ materialId: material.id }, "Material adicionado com sucesso");
   } catch (error: any) {
     console.error("Erro ao adicionar material:", error);
+    if (error.message?.includes("RESOURCE_EXHAUSTED") || error.message?.includes("spending cap")) {
+      return actionError("Sua chave API do Gemini excedeu a cota de uso ou limite financeiro. Por favor, gerencie seus limites no Google AI Studio.");
+    }
     return actionError(error.message || "Erro ao adicionar material");
   }
 }
@@ -951,6 +954,12 @@ export async function importWebMaterials(webSourceIds: string[]) {
     };
   } catch (error: any) {
     console.error("Erro ao importar materiais web:", error);
+    if (error.message?.includes("RESOURCE_EXHAUSTED") || error.message?.includes("spending cap")) {
+      return {
+        success: false,
+        error: "Sua chave API do Gemini excedeu a cota de uso ou limite financeiro. Por favor, gerencie seus limites no Google AI Studio.",
+      };
+    }
     return {
       success: false,
       error: error.message || "Erro ao importar materiais",

@@ -47,7 +47,37 @@ export async function ingestWebMaterialAction(
     // 1. Executa a engrenagem do Firecrawl + Tokenizer
     const { markdownCompleto, chunks } = await scrapeAndProcessSource(url);
 
-    // 2. Inicia Transação Atômica no Drizzle (Padrão Sênior Local-First)
+    // Prepara os chunks para inserção em lote (Bulk Insert) com Vetorização FORA da transação de banco
+    const processedChunks: Array<{
+      content: string;
+      embedding: number[] | null;
+      originTag: string;
+    }> = [];
+    if (chunks.length > 0) {
+      const { getEmbedding, classifyChunk } = await import("@/lib/ai-optimizations");
+      
+      // Process chunks in parallel batches to speed up ingestion
+      const batchSize = 5;
+
+      for (let i = 0; i < chunks.length; i += batchSize) {
+        const batch = chunks.slice(i, i + batchSize);
+        const results = await Promise.all(batch.map(async (chunk) => {
+          try {
+            const [embedding, originTag] = await Promise.all([
+              getEmbedding(chunk.content),
+              classifyChunk(chunk.content)
+            ]);
+            return { content: chunk.content, embedding, originTag };
+          } catch (err) {
+            console.error(`[Materials-Action] Erro ao processar chunk:`, err);
+            return { content: chunk.content, embedding: null, originTag: "Lei" };
+          }
+        }));
+        processedChunks.push(...results);
+      }
+    }
+
+    // 2. Inicia Transação Atômica Rápida no Drizzle (Padrão Sênior Local-First)
     const result = await db.transaction(async (tx) => {
       // Cria o registro pai na tabela de materiais
       const [newMaterial] = await tx.insert(materials).values({
@@ -61,31 +91,7 @@ export async function ingestWebMaterialAction(
         contentHash: crypto.randomUUID(), // Hash temporário de controle
       }).returning();
 
-      // Prepara os chunks para inserção em lote (Bulk Insert) com Vetorização
-      if (chunks.length > 0) {
-        const { getEmbedding, classifyChunk } = await import("@/lib/ai-optimizations");
-        
-        // Process chunks in parallel batches to speed up ingestion
-        const batchSize = 5;
-        const processedChunks = [];
-
-        for (let i = 0; i < chunks.length; i += batchSize) {
-          const batch = chunks.slice(i, i + batchSize);
-          const results = await Promise.all(batch.map(async (chunk) => {
-            try {
-              const [embedding, originTag] = await Promise.all([
-                getEmbedding(chunk.content),
-                classifyChunk(chunk.content)
-              ]);
-              return { content: chunk.content, embedding, originTag };
-            } catch (err) {
-              console.error(`[Materials-Action] Erro ao processar chunk:`, err);
-              return { content: chunk.content, embedding: null, originTag: "Lei" };
-            }
-          }));
-          processedChunks.push(...results);
-        }
-
+      if (processedChunks.length > 0) {
         const chunksToInsert = processedChunks.map((pc) => ({
           materialId: newMaterial.id,
           subjectId,
@@ -104,6 +110,9 @@ export async function ingestWebMaterialAction(
     return actionSuccess(result, 'Material da web garimpado e indexado com sucesso!');
   } catch (error: any) {
     console.error("[Materials-Action] Falha no garimpo:", error.message);
+    if (error.message?.includes("RESOURCE_EXHAUSTED") || error.message?.includes("spending cap")) {
+      return actionError("Sua chave API do Gemini excedeu a cota de uso ou limite financeiro. Por favor, gerencie seus limites no Google AI Studio.");
+    }
     return actionError(`Erro ao executar migração do Garimpo: ${error.message}`);
   }
 }
