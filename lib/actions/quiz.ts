@@ -19,7 +19,8 @@ import { getEmbedding } from "@/lib/services/ai/ai-optimizations";
 export async function generateQuizAction(
   benchId: string, 
   subjectId: string, 
-  selectedEditalItemIds: string[]
+  selectedEditalItemIds: string[],
+  materialId?: string
 ) {
   try {
     // 1. Get Context: Using Surgical RAG
@@ -35,22 +36,47 @@ export async function generateQuizAction(
     const queryEmbedding = await getEmbedding(searchQueries);
 
     // Retrieval: Get Top 15 relevant chunks
-    const relevantChunks = await db
-      .select({
-        content: materialChunks.content,
-      })
-      .from(materialChunks)
-      .innerJoin(materials, eq(materialChunks.materialId, materials.id))
-      .where(
-        and(
-          eq(materials.benchId, benchId),
-          selectedEditalItemIds.length > 0 
-            ? inArray(materials.editalItemId, selectedEditalItemIds)
-            : eq(materials.subjectId, subjectId)
+    let relevantChunks = [];
+    
+    if (queryEmbedding) {
+      relevantChunks = await db
+        .select({
+          content: materialChunks.content,
+        })
+        .from(materialChunks)
+        .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+        .where(
+          and(
+            eq(materials.benchId, benchId),
+            materialId ? eq(materials.id, materialId) : (
+              selectedEditalItemIds.length > 0 
+                ? inArray(materials.editalItemId, selectedEditalItemIds)
+                : eq(materials.subjectId, subjectId)
+            )
+          )
         )
-      )
-      .orderBy(t => desc(sql`1 - (${materialChunks.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector)`))
-      .limit(15);
+        .orderBy(t => desc(sql`1 - (${materialChunks.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector)`))
+        .limit(15);
+    } else {
+      // Fallback if embedding fails
+      relevantChunks = await db
+        .select({
+          content: materialChunks.content,
+        })
+        .from(materialChunks)
+        .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+        .where(
+          and(
+            eq(materials.benchId, benchId),
+            materialId ? eq(materials.id, materialId) : (
+              selectedEditalItemIds.length > 0 
+                ? inArray(materials.editalItemId, selectedEditalItemIds)
+                : eq(materials.subjectId, subjectId)
+            )
+          )
+        )
+        .limit(15);
+    }
 
     const contextText = relevantChunks
       .map(c => c.content)

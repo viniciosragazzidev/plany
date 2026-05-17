@@ -23,7 +23,7 @@ import { WebResearchDialog } from "./web-research-dialog";
 import { ImportEditalDialog } from "@/components/onboarding/import-edital-dialog";
 import { MotivationalWidget } from "@/components/ui/motivational-widget";
 import { useBench } from "./bench-context";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getQuizzesAction, generateQuizAction } from "@/lib/actions/quiz";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -69,7 +69,19 @@ export function IntelligenceTools({
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [isLoadingQuizzes, setIsLoadingQuizzes] = useState(false);
   
-  const [selectedEditalItems, setSelectedEditalItems] = useState<string[]>([]);
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
+
+  const materialsBySubject = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    if (!materials) return map;
+    materials.forEach(m => {
+      const subject = subjects.find(s => s.id === m.subjectId);
+      const key = subject?.title || "Geral";
+      if (!map[key]) map[key] = [];
+      map[key].push(m);
+    });
+    return map;
+  }, [materials, subjects]);
 
   const daysLeft = differenceInDays(new Date(targetDate), new Date());
   const totalCount = editalItems.length;
@@ -114,26 +126,16 @@ export function IntelligenceTools({
   }, [sidebarState, benchId, isGeneratingQuiz]);
 
   const handleGenerateQuiz = async () => {
-    if (selectedEditalItems.length === 0) {
-      toast.error("Selecione pelo menos um assunto.");
+    if (!selectedMaterialId) {
+      toast.error("Selecione um material.");
       return;
     }
 
-    // Identify subjectId from selected edital items
-    const firstItemId = selectedEditalItems[0];
-    const firstItem = editalItems.find(item => item.id === firstItemId);
-    
-    if (!firstItem) return;
-
-    const matchedSubject = subjects.find(s => 
-      s.title.toLowerCase() === firstItem.category.toLowerCase() ||
-      firstItem.category.toLowerCase().includes(s.title.toLowerCase())
-    );
-
-    const subjectId = matchedSubject?.id || (subjects.length > 0 ? subjects[0].id : null);
+    const matchedMaterial = materials.find(m => m.id === selectedMaterialId);
+    const subjectId = matchedMaterial?.subjectId || (subjects.length > 0 ? subjects[0].id : "");
 
     if (!subjectId) {
-      toast.error("Nenhuma matéria encontrada vinculada a este assunto.");
+      toast.error("Nenhuma matéria encontrada vinculada a este material.");
       return;
     }
 
@@ -142,11 +144,11 @@ export function IntelligenceTools({
     toast.info("Gerando seu quiz personalizado... 🧠");
     
     try {
-      const res = await generateQuizAction(benchId, subjectId, selectedEditalItems);
+      const res = await generateQuizAction(benchId, subjectId, [], selectedMaterialId);
       
       if (res.success) {
         toast.success("Quiz gerado com sucesso!");
-        setSelectedEditalItems([]);
+        setSelectedMaterialId(null);
         await loadQuizzes();
       } else {
         toast.error(res.error || "Erro ao gerar quiz");
@@ -166,7 +168,7 @@ export function IntelligenceTools({
   }
 
   if (sidebarState === 'flashcard_list' || sidebarState === 'flashcard_study' || sidebarState === 'flashcard_config') {
-    return <FlashcardsTool benchId={benchId} subjects={subjects as any} />;
+    return <FlashcardsTool benchId={benchId} subjects={subjects as any} materials={materials as any} />;
   }
 
   return (
@@ -369,28 +371,39 @@ export function IntelligenceTools({
             <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
                {/* Simplified Quiz Config List */}
                <div className="space-y-4">
-                  {categories.map(cat => (
-                    <div key={cat} className="space-y-2 min-w-0">
-                       <h5 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest truncate" title={cat}>{cat}</h5>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Selecione 1 Material Base</p>
+                  {materials.length > 0 ? Object.entries(materialsBySubject).map(([subject, mats]) => (
+                    <div key={subject} className="space-y-2 min-w-0">
+                       <h5 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest truncate">{subject}</h5>
                        <div className="space-y-1.5 pl-2 border-l-2 border-primary/10">
-                          {editalItems.filter(i => i.category === cat).map(item => (
-                            <div key={item.id} className="flex items-center gap-2 min-w-0">
-                               <Checkbox id={item.id} checked={selectedEditalItems.includes(item.id)} onCheckedChange={(checked) => checked ? setSelectedEditalItems(prev => [...prev, item.id]) : setSelectedEditalItems(prev => prev.filter(id => id !== item.id))} />
+                          {mats.map(m => (
+                            <div key={m.id} className="flex items-center gap-2 min-w-0">
+                               <Checkbox 
+                                 id={m.id} 
+                                 checked={selectedMaterialId === m.id} 
+                                 onCheckedChange={(checked) => checked ? setSelectedMaterialId(m.id) : setSelectedMaterialId(null)} 
+                               />
                                <Label 
-                                  htmlFor={item.id} 
+                                  htmlFor={m.id} 
                                   className="text-[11px] font-medium leading-tight truncate flex-1 cursor-pointer"
-                                  title={item.topic}
+                                  title={m.title}
                                 >
-                                  {item.topic}
+                                  {m.title}
                                 </Label>
                             </div>
                           ))}
                        </div>
                     </div>
-                  ))}
+                  )) : (
+                    <p className="text-xs text-muted-foreground">Nenhum material cadastrado nesta bancada.</p>
+                  )}
                </div>
                <div className="pt-4 border-t border-border/50">
-                  <Button className="w-full h-12 rounded-2xl gap-2 font-black uppercase text-xs bg-primary text-white shadow-lg shadow-primary/20" onClick={handleGenerateQuiz} disabled={selectedEditalItems.length === 0}>
+                  <Button 
+                    className="w-full h-12 rounded-2xl gap-2 font-black uppercase text-xs bg-primary text-white shadow-lg shadow-primary/20" 
+                    onClick={handleGenerateQuiz} 
+                    disabled={!selectedMaterialId}
+                  >
                      <HugeiconsIcon icon={SparklesIcon} size={18} />
                      Gerar 10 Questões
                   </Button>

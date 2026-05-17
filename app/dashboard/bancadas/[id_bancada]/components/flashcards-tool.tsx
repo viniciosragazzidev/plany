@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { 
-  FlashIcon, 
-  Plus, 
-  ArrowLeft01Icon, 
-  Tick01Icon, 
+import {
+  FlashIcon,
+  Plus,
+  ArrowLeft01Icon,
+  Tick01Icon,
   Cancel01Icon,
   SparklesIcon,
   Settings01Icon,
@@ -14,12 +14,13 @@ import {
   RefreshDotIcon,
   CheckmarkCircle02Icon
 } from "@hugeicons/core-free-icons";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useBench } from "./bench-context";
-import { 
-  getFlashcardStatsAction, 
-  generateFlashcardsAction, 
+import {
+  getFlashcardStatsAction,
+  generateFlashcardsAction,
   getFlashcardsForReviewAction,
   submitFlashcardReviewAction
 } from "@/lib/actions/flashcards";
@@ -30,13 +31,14 @@ import { Badge } from "@/components/ui/badge";
 interface FlashcardsToolProps {
   benchId: string;
   subjects: { id: string; title: string }[];
+  materials?: { id: string; title: string; subjectId: string | null }[];
 }
 
-export function FlashcardsTool({ benchId, subjects }: FlashcardsToolProps) {
-  const { 
-    sidebarState, 
-    setSidebarState, 
-    isGeneratingFlashcards, 
+export function FlashcardsTool({ benchId, subjects, materials = [] }: FlashcardsToolProps) {
+  const {
+    sidebarState,
+    setSidebarState,
+    isGeneratingFlashcards,
     setIsGeneratingFlashcards,
     activeFlashcardSubjectId,
     setActiveFlashcardSubjectId
@@ -79,6 +81,7 @@ export function FlashcardsTool({ benchId, subjects }: FlashcardsToolProps) {
 
   useEffect(() => {
     if (sidebarState === 'flashcard_list') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadStats();
     }
   }, [sidebarState, benchId]);
@@ -97,11 +100,11 @@ export function FlashcardsTool({ benchId, subjects }: FlashcardsToolProps) {
     setIsLoading(false);
   };
 
-  const handleGenerate = async (subjectId: string) => {
+  const handleGenerate = async (subjectId: string, materialId: string) => {
     setIsGeneratingFlashcards(true);
-    
+
     try {
-      const res = await generateFlashcardsAction(benchId, subjectId);
+      const res = await generateFlashcardsAction(benchId, subjectId, materialId);
       if (res.success) {
         toast.success(`Criamos ${res.count} flashcards de elite para você!`);
         loadStats();
@@ -115,6 +118,17 @@ export function FlashcardsTool({ benchId, subjects }: FlashcardsToolProps) {
       setIsGeneratingFlashcards(false);
     }
   };
+
+  const materialsBySubject = React.useMemo(() => {
+    const map: Record<string, any[]> = {};
+    materials.forEach(m => {
+      const subject = subjects.find(s => s.id === m.subjectId);
+      const key = subject?.title || "Geral";
+      if (!map[key]) map[key] = [];
+      map[key].push(m);
+    });
+    return map;
+  }, [materials, subjects]);
 
   const handleReview = async (performance: number) => {
     const card = reviewCards[currentCardIndex];
@@ -140,7 +154,7 @@ export function FlashcardsTool({ benchId, subjects }: FlashcardsToolProps) {
             <div className="w-20 h-20 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
             <HugeiconsIcon icon={FlashIcon} size={32} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary animate-pulse" />
           </div>
-          
+
           <div className="space-y-2">
             <h3 className="text-lg font-bold">Gerando Flashcards</h3>
             <p className="text-sm text-muted-foreground animate-pulse duration-1000 h-10 flex items-center justify-center">
@@ -149,9 +163,9 @@ export function FlashcardsTool({ benchId, subjects }: FlashcardsToolProps) {
           </div>
 
           <div className="w-full max-w-[200px] h-1.5 bg-secondary rounded-full overflow-hidden">
-             <div className="h-full bg-primary animate-progress-infinite" />
+            <div className="h-full bg-primary animate-progress-infinite" />
           </div>
-          
+
           <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest pt-4">
             Isso pode levar alguns segundos
           </p>
@@ -174,22 +188,41 @@ export function FlashcardsTool({ benchId, subjects }: FlashcardsToolProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Escolha uma Disciplina</p>
-          {subjects.map((s) => (
-            <Card 
-              key={s.id} 
-              className="p-4 rounded-2xl border-border/50 hover:border-primary/50 transition-all cursor-pointer bg-background flex items-center justify-between group"
-              onClick={() => handleGenerate(s.id)}
-            >
-              <div className="flex items-center gap-3">
-                 <div className="w-8 h-8 rounded-lg flex items-center justify-center text-primary bg-primary/5 group-hover:bg-primary/10 transition-colors">
-                    <HugeiconsIcon icon={Book01Icon} size={16} />
-                 </div>
-                 <span className="text-sm font-bold">{s.title}</span>
-              </div>
-              <HugeiconsIcon icon={SparklesIcon} size={16} className="text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-            </Card>
-          ))}
+          {materials && materials.length > 0 ? (
+            <div className="space-y-4">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Escolha 1 Material (Base)</p>
+              {Object.entries(materialsBySubject).map(([subject, mats]) => (
+                <div key={subject} className="space-y-2">
+                  <h5 className="text-[11px] font-bold text-foreground/70 flex items-center gap-2">
+                    <div className="w-1 h-3 bg-amber-500 rounded-full" />
+                    {subject}
+                  </h5>
+                  <div className="space-y-2 pl-2">
+                    {mats.map(m => (
+                      <Card
+                        key={m.id}
+                        className="p-3 rounded-xl border-border/50 hover:border-amber-500/50 transition-all cursor-pointer bg-background flex items-center justify-between group"
+                        onClick={() => {
+                          const subj = subjects.find(s => s.title === subject);
+                          handleGenerate(subj?.id || (subjects.length > 0 ? subjects[0].id : ""), m.id);
+                        }}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <div className="w-6 h-6 shrink-0 rounded-md flex items-center justify-center text-amber-500 bg-amber-500/5 group-hover:bg-amber-500/10 transition-colors">
+                            <HugeiconsIcon icon={Book01Icon} size={14} />
+                          </div>
+                          <span className="text-xs font-medium truncate">{m.title}</span>
+                        </div>
+                        <HugeiconsIcon icon={SparklesIcon} size={14} className="text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2" />
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground text-center mt-10">Nenhum material encontrado.</p>
+          )}
         </div>
       </div>
     );
@@ -197,7 +230,7 @@ export function FlashcardsTool({ benchId, subjects }: FlashcardsToolProps) {
 
   if (sidebarState === 'flashcard_study') {
     const card = reviewCards[currentCardIndex];
-    
+
     return (
       <div className="flex flex-col h-full bg-secondary/5 border-l border-border/50 w-80 shrink-0 font-sans animate-in slide-in-from-right duration-300">
         <div className="p-6 border-b border-border/50 flex items-center justify-between bg-background/50">
@@ -214,7 +247,7 @@ export function FlashcardsTool({ benchId, subjects }: FlashcardsToolProps) {
 
         <div className="flex-1 p-6 flex flex-col items-center justify-center gap-8">
           {/* Flashcard Component */}
-          <div 
+          <div
             className="relative w-full aspect-[3/4] cursor-pointer perspective-1000 group"
             onClick={() => setIsFlipped(!isFlipped)}
           >
@@ -228,7 +261,7 @@ export function FlashcardsTool({ benchId, subjects }: FlashcardsToolProps) {
                 <h3 className="text-lg font-bold leading-tight">{card?.front}</h3>
                 <p className="text-[10px] text-muted-foreground mt-8 uppercase tracking-widest font-bold opacity-50">Toque para revelar</p>
               </Card>
-              
+
               {/* Back */}
               <Card className="absolute inset-0 w-full h-full p-8 flex flex-col items-center justify-center text-center backface-hidden rotate-y-180 rounded-[2rem] border-2 border-emerald-500/20 bg-background shadow-xl">
                 <HugeiconsIcon icon={CheckmarkCircle02Icon} size={32} className="text-emerald-500/20 mb-6" />
@@ -248,7 +281,7 @@ export function FlashcardsTool({ benchId, subjects }: FlashcardsToolProps) {
               { val: 4, label: "Bom", color: "bg-blue-500" },
               { val: 5, label: "Fácil", color: "bg-emerald-500" }
             ].map((btn) => (
-              <Button 
+              <Button
                 key={btn.val}
                 variant="outline"
                 className="flex-col h-16 gap-1 rounded-2xl hover:border-foreground/20"
@@ -283,19 +316,19 @@ export function FlashcardsTool({ benchId, subjects }: FlashcardsToolProps) {
         {/* Stats Section */}
         {stats && (
           <div className="grid grid-cols-2 gap-3">
-             <Card className="p-4 rounded-2xl bg-background border-border/50 text-center space-y-1">
-                <span className="text-2xl font-black text-foreground">{stats.total}</span>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase">Total</p>
-             </Card>
-             <Card className="p-4 rounded-2xl bg-amber-500/5 border-amber-500/20 text-center space-y-1">
-                <span className="text-2xl font-black text-amber-500">{stats.dueForReview}</span>
-                <p className="text-[10px] font-bold text-amber-500 uppercase tracking-tighter">Para Revisar</p>
-             </Card>
+            <Card className="p-4 rounded-2xl bg-background border-border/50 text-center space-y-1">
+              <span className="text-2xl font-black text-foreground">{stats.total}</span>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase">Total</p>
+            </Card>
+            <Card className="p-4 rounded-2xl bg-amber-500/5 border-amber-500/20 text-center space-y-1">
+              <span className="text-2xl font-black text-amber-500">{stats.dueForReview}</span>
+              <p className="text-[10px] font-bold text-amber-500 uppercase tracking-tighter">Para Revisar</p>
+            </Card>
           </div>
         )}
 
         <div className="space-y-3">
-          <Button 
+          <Button
             className="w-full h-12 rounded-2xl gap-2 font-bold uppercase text-[10px] tracking-widest shadow-lg shadow-amber-500/10 bg-amber-500 hover:bg-amber-600 text-white"
             onClick={() => setSidebarState('flashcard_config')}
             disabled={isGeneratingFlashcards}
@@ -308,7 +341,7 @@ export function FlashcardsTool({ benchId, subjects }: FlashcardsToolProps) {
             {isGeneratingFlashcards ? "Gerando..." : "Novos Flashcards"}
           </Button>
 
-          <Button 
+          <Button
             variant="outline"
             className="w-full h-12 rounded-2xl gap-2 font-bold uppercase text-[10px] tracking-widest"
             onClick={() => startReview()}
@@ -321,19 +354,19 @@ export function FlashcardsTool({ benchId, subjects }: FlashcardsToolProps) {
 
         {/* Subjects List */}
         <div className="space-y-4">
-           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Por Disciplina</p>
-           <div className="space-y-2">
-             {subjects.map((s) => (
-               <div 
-                  key={s.id} 
-                  className="p-3 rounded-xl border border-border/50 bg-background flex items-center justify-between hover:border-amber-500/50 transition-all cursor-pointer group"
-                  onClick={() => startReview(s.id)}
-                >
-                  <span className="text-xs font-bold">{s.title}</span>
-                  <HugeiconsIcon icon={FlashIcon} size={14} className="text-amber-500 opacity-40 group-hover:opacity-100 transition-opacity" />
-               </div>
-             ))}
-           </div>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] ml-1">Por Disciplina</p>
+          <div className="space-y-2">
+            {subjects.map((s) => (
+              <div
+                key={s.id}
+                className="p-3 rounded-xl border border-border/50 bg-background flex items-center justify-between hover:border-amber-500/50 transition-all cursor-pointer group"
+                onClick={() => startReview(s.id)}
+              >
+                <span className="text-xs font-bold">{s.title}</span>
+                <HugeiconsIcon icon={FlashIcon} size={14} className="text-amber-500 opacity-40 group-hover:opacity-100 transition-opacity" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

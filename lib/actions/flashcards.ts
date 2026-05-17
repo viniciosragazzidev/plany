@@ -19,6 +19,7 @@ import { getEmbedding } from "@/lib/services/ai/ai-optimizations";
 export async function generateFlashcardsAction(
   benchId: string, 
   subjectId: string, 
+  materialId?: string,
   topicText?: string
 ) {
   try {
@@ -29,18 +30,27 @@ export async function generateFlashcardsAction(
     const searchQuery = topicText || subject?.title || "Geral";
     const queryEmbedding = await getEmbedding(searchQuery);
 
-    // 1. RAG: Buscar os 10 chunks mais relevantes para o assunto
-    const relevantChunks = await db
-      .select({
-        content: materialChunks.content,
-      })
-      .from(materialChunks)
-      .innerJoin(materials, eq(materialChunks.materialId, materials.id))
-      .where(eq(materials.benchId, benchId))
-      .orderBy(t => desc(sql`1 - (${materialChunks.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector)`))
-      .limit(10);
+    let contextText = "";
 
-    let contextText = relevantChunks.map(c => c.content).join("\n\n");
+    if (queryEmbedding) {
+      // 1. RAG: Buscar os 10 chunks mais relevantes para o assunto
+      const relevantChunks = await db
+        .select({
+          content: materialChunks.content,
+        })
+        .from(materialChunks)
+        .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+        .where(
+          and(
+            eq(materials.benchId, benchId),
+            materialId ? eq(materials.id, materialId) : undefined
+          )
+        )
+        .orderBy(t => desc(sql`1 - (${materialChunks.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector)`))
+        .limit(10);
+
+      contextText = relevantChunks.map(c => c.content).join("\n\n");
+    }
 
     // FALLBACK: Se não houver chunks vetorizados, tenta buscar o conteúdo bruto dos materiais
     if (!contextText) {
@@ -51,7 +61,8 @@ export async function generateFlashcardsAction(
         .where(
           and(
             eq(materials.benchId, benchId),
-            subjectId ? eq(materials.subjectId, subjectId) : undefined
+            subjectId ? eq(materials.subjectId, subjectId) : undefined,
+            materialId ? eq(materials.id, materialId) : undefined
           )
         )
         .limit(3);
