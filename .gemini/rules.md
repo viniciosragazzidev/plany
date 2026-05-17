@@ -4,6 +4,22 @@ Este arquivo consolida todas as regras, padrões arquiteturais, de UX e de códi
 
 ---
 
+## 0. REGRA MESTRA: Testes Primeiro & Cobertura Total (TDD Obrigatório)
+> [!IMPORTANT]
+> **ESTA É A DIRETRIZ SUPREMA DO PROJETO:** Antes de escrever qualquer linha de código de produção para uma nova funcionalidade, correção ou refatoração, **você deve obrigatoriamente criar os testes automatizados correspondentes (TDD)**.
+>
+> 1. **Testes Antes do Código:** Desenhe e escreva os casos de teste completos (unitários e de integração usando `vitest`) descrevendo o comportamento esperado da funcionalidade.
+> 2. **Obrigatoriedade Absoluta:** Nenhuma funcionalidade ou tela deve ser desenvolvida ou alterada sem que haja a cobertura correspondente de testes. Se há lógica nova, há teste novo.
+> 3. **Fluxo de Desenvolvimento:**
+>    *   **Passo 1:** Crie os arquivos de teste `.test.ts` ou `.test.tsx` correspondentes na pasta.
+>    *   **Passo 2:** Desenvolva os testes cobrindo fluxos de sucesso, erros e casos de borda.
+>    *   **Passo 3:** Implemente o código de produção correspondente até que todos os testes rodem e passem com 100% de sucesso.
+>    *   **Passo 4:** Valide o build com `npm run test` e `npx vercel build`.
+>
+> Não há exceções: todos os códigos novos exigem cobertura de testes antes da implementação.
+
+---
+
 ## 1. Arquitetura Local-First & Performance (0ms)
 **REGRA DE OURO:** A interface deve reagir instantaneamente (0ms) a qualquer ação de escrita do usuário. O PLANY não é um site, é um software nativo no navegador.
 

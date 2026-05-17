@@ -1,0 +1,42 @@
+# PLANY - CURSOR RULES & DIRECTIONS
+
+This file dictates all instructions, architectural patterns, and quality mandates for AI Agents working on the **PLANY** codebase.
+
+---
+
+## 🚨 REGRA SUPREMA: Testes Primeiro & Cobertura Total (TDD Obrigatório)
+> [!IMPORTANT]
+> **ESTA É A DIRETRIZ MESTRA DESTE PROJETO:** Antes de escrever qualquer código de produção para novas funcionalidades, modificações ou refatorações, **você deve obrigatoriamente criar os testes automatizados correspondentes (TDD)**.
+>
+> 1. **Testes Antes do Código:** Desenhe e escreva arquivos de teste `.test.ts` ou `.test.tsx` (utilizando `vitest`) que definam o comportamento esperado da funcionalidade antes de implementar a funcionalidade.
+> 2. **Obrigatoriedade:** Nenhuma funcionalidade deve ser considerada pronta sem que haja a cobertura correspondente de testes. Se há lógica nova, há teste correspondente criado antes.
+> 3. **Fluxo de Trabalho:**
+>    *   **Passo 1:** Escreva os testes automatizados com sucesso, erros e caminhos de borda.
+>    *   **Passo 2:** Crie o código de produção necessário para fazer com que os testes passem com 100% de sucesso.
+>    *   **Passo 3:** Valide o build executando `npm run test` e `npx vercel build`.
+>
+> **SEM EXCEÇÕES:** Se você criar qualquer funcionalidade sem escrever testes correspondentes antes, você falhou.
+
+---
+
+## 🛠️ Stack Tecnológica & Padrões
+- **Core:** Next.js (com App Router), TypeScript, Node.js.
+- **Banco de Dados:** PostgreSQL, Drizzle ORM, pgvector (para RAG).
+- **Estilização:** CSS Vanilla com variáveis HSL refinadas. Evitar Tailwind puro se fugir do design system, usar shadcn/ui.
+- **Autenticação:** Better-Auth (tabelas no singular: `user`, `session`, `account`).
+- **Testes:** Vitest (TDD obrigatório).
+
+---
+
+## ⚡ Lógica de Arquitetura & UX
+1. **Local-First & Optimistic Updates (0ms):** A interface deve responder na hora para qualquer ação de escrita do usuário (`Create`, `Update`, `Delete`), atualizando o Zustand/cache local antes mesmo de disparar a mutation de background no servidor. Use Skeletons somente para o carregamento inicial (Read).
+2. **Preservação Extrema de Tokens:** Processamos e fatiamos PDFs para Markdown estruturado antes de passar pela IA, utilizando Semantic Caching (similaridade > 0.95 no banco ativa o cache imediato com custo zero de token).
+3. **Services & Server Actions Layer:** Não use queries diretas do Drizzle em componentes do React. Toda lógica de banco de dados reside em `lib/actions/` organizada por domínio de serviços, retornando `ActionResponse<T>`.
+
+---
+
+## 📖 Documentação de Referência
+Sempre leia e aplique rigorosamente os arquivos centrais de conhecimento do repositório:
+- **Regras Detalhadas:** [rules.md](file:///c:/Users/kyper/Desktop/Projects/plany/.gemini/rules.md)
+- **Manifesto dos Agentes:** [AGENTS.md](file:///c:/Users/kyper/Desktop/Projects/plany/AGENTS.md)
+- **Mapa de Funcionalidades:** [funcionalidades.md](file:///c:/Users/kyper/Desktop/Projects/plany/.gemini/funcionalidades.md)
