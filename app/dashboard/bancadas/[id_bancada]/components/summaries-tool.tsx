@@ -255,58 +255,94 @@ export function SummariesTool({ benchId, subjects, materials }: SummariesToolPro
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
-              <div className="space-y-4">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Materiais Base</p>
-                {Object.entries(materialsBySubject).map(([subject, mats]) => (
-                  <div key={subject} className="space-y-2">
-                    <h5 className="text-[11px] font-bold text-foreground/70 flex items-center gap-2">
-                      <div className="w-1 h-3 bg-emerald-500 rounded-full" />
-                      {subject}
-                    </h5>
-                    <div className="pl-3 space-y-2 border-l border-border/50 ml-0.5">
-                      {mats.map(m => (
-                        <div key={m.id} className="flex items-center space-x-2">
-                          <Checkbox 
-                            id={m.id} 
-                            checked={selectedMaterials.includes(m.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) setSelectedMaterials(prev => [...prev, m.id]);
-                              else setSelectedMaterials(prev => prev.filter(id => id !== m.id));
-                            }}
-                          />
-                          <Label 
-                            htmlFor={m.id}
-                            className="text-[11px] leading-tight cursor-pointer font-medium text-muted-foreground hover:text-foreground transition-colors line-clamp-1"
-                          >
-                            {m.title}
-                          </Label>
-                        </div>
-                      ))}
+              {materials.length > 0 ? (
+                <div className="space-y-4">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Materiais Base</p>
+                  {Object.entries(materialsBySubject).map(([subject, mats]) => (
+                    <div key={subject} className="space-y-2">
+                      <h5 className="text-[11px] font-bold text-foreground/70 flex items-center gap-2">
+                        <div className="w-1 h-3 bg-emerald-500 rounded-full" />
+                        {subject}
+                      </h5>
+                      <div className="pl-3 space-y-2 border-l border-border/50 ml-0.5">
+                        {mats.map(m => (
+                          <div key={m.id} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={m.id} 
+                              checked={selectedMaterials.includes(m.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) setSelectedMaterials(prev => [...prev, m.id]);
+                                else setSelectedMaterials(prev => prev.filter(id => id !== m.id));
+                              }}
+                            />
+                            <Label 
+                              htmlFor={m.id}
+                              className="text-[11px] leading-tight cursor-pointer font-medium text-muted-foreground hover:text-foreground transition-colors line-clamp-1"
+                            >
+                              {m.title}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-center p-4 space-y-6 animate-in fade-in zoom-in duration-500">
+                  <div className="w-16 h-16 bg-emerald-500/10 rounded-[2rem] flex items-center justify-center text-emerald-500 shadow-inner">
+                    <HugeiconsIcon icon={InformationCircleIcon} size={32} />
                   </div>
-                ))}
-              </div>
-            </div>
+                  
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-black uppercase tracking-tight">Referência Vazia</h4>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Nenhum material encontrado nas referências importadas para esta bancada.
+                    </p>
+                  </div>
 
-            <div className="p-6 border-t border-border/50 bg-background/50">
-              <Button 
-                className="w-full h-12 rounded-2xl gap-2 font-bold uppercase text-xs shadow-lg shadow-emerald-500/10 bg-emerald-600 hover:bg-emerald-700 text-white"
-                onClick={handleGenerate}
-                disabled={isGeneratingSummary || selectedMaterials.length === 0}
-              >
-                {isGeneratingSummary ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <HugeiconsIcon icon={StarsIcon} size={18} />
-                )}
-                {isGeneratingSummary ? "Processando..." : "Gerar Resumo 2.0"}
-              </Button>
-              {isGeneratingSummary && (
-                <p className="text-[10px] text-center text-emerald-600 font-medium mt-3 animate-pulse italic">
-                  {currentLoadingMsg}
-                </p>
+                  <div className="w-full space-y-2 pt-4">
+                    <Button 
+                      variant="outline" 
+                      className="w-full h-11 rounded-xl border-emerald-500/20 hover:border-emerald-500/50 hover:bg-emerald-500/5 gap-2 text-[10px] font-black uppercase tracking-widest transition-all"
+                      onClick={() => setSidebarState('default')}
+                    >
+                      <HugeiconsIcon icon={SparklesIcon} size={16} className="text-emerald-500" />
+                      Iniciar Garimpo
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full h-11 rounded-xl gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                      onClick={() => setSidebarState('default')}
+                    >
+                      <HugeiconsIcon icon={Plus} size={16} />
+                      Adicionar Manualmente
+                    </Button>
+                  </div>
+                </div>
               )}
             </div>
+
+            {materials.length > 0 && (
+              <div className="p-6 border-t border-border/50 bg-background/50">
+                <Button 
+                  className="w-full h-12 rounded-2xl gap-2 font-bold uppercase text-xs shadow-lg shadow-emerald-500/10 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={handleGenerate}
+                  disabled={isGeneratingSummary || selectedMaterials.length === 0}
+                >
+                  {isGeneratingSummary ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <HugeiconsIcon icon={StarsIcon} size={18} />
+                  )}
+                  {isGeneratingSummary ? "Processando..." : "Gerar Resumo 2.0"}
+                </Button>
+                {isGeneratingSummary && (
+                  <p className="text-[10px] text-center text-emerald-600 font-medium mt-3 animate-pulse italic">
+                    {currentLoadingMsg}
+                  </p>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
