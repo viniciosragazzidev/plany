@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { materials, materialChunks } from '@/lib/db/schema';
-import { scrapeAndProcessSource } from '@/lib/services/infrastructure/web-scraper';
+import { scrapeAndProcessSource } from '@/lib/services/research/firecrawl-scraper';
 
 /**
  * Interface unificada para respostas de Server Actions no PLANY.
@@ -67,7 +67,7 @@ export async function ingestWebMaterialAction(
       originTag: string;
     }> = [];
     if (chunks.length > 0) {
-      const { getEmbedding, classifyChunk } = await import("@/lib/ai-optimizations");
+      const { getEmbedding, classifyChunk } = await import("@/lib/services/ai/ai-optimizations");
       
       // Process chunks in parallel batches to speed up ingestion
       const batchSize = 5;

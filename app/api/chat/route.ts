@@ -4,8 +4,8 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { studyBenches, materials, materialChunks, semanticCache } from "@/lib/db/schema";
 import { eq, and, inArray, sql, desc } from "drizzle-orm";
-import { getEmbedding } from "@/lib/ai-optimizations";
-import { generateAIContent } from "@/lib/ai-service";
+import { getEmbedding } from "@/lib/services/ai/ai-optimizations";
+import { generateAIContent } from "@/lib/services/ai/ai-service";
 
 export const maxDuration = 30;
 

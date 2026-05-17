@@ -1,4 +1,4 @@
-import { generateAIContent } from "@/lib/ai-service";
+import { generateAIContent } from "@/lib/services/ai/ai-service";
 
 export interface QueryGenInput {
   materia: string;

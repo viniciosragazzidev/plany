@@ -1,6 +1,6 @@
 'use server'
 
-import { generateAIContent } from "@/lib/ai-service";
+import { generateAIContent } from "@/lib/services/ai/ai-service";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { actionSuccess, actionError, ActionResponse } from "./types";

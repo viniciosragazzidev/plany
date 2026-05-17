@@ -8,7 +8,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { generateAIContent } from "@/lib/ai-service";
+import { generateAIContent } from "@/lib/services/ai/ai-service";
 import { createHash } from "crypto";
 
 function generateMaterialsHash(ids: string[]): string {

@@ -5,15 +5,15 @@ import { studyBenches, editalItems, materials, subjects, webSources, materialChu
 import { eq, sql, and, desc, ilike } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-import { generateSearchQueries, QueryGenInput, researchEmptyEditalTopics, beautifyMaterialTitle } from "@/lib/web-research";
-import { htmlToMarkdown } from "@/lib/markdown-converter";
-import { scrapeSearchResults, calculateAuthorityScore } from "@/lib/web-scraper";
-import { generateAIContent } from "@/lib/ai-service";
+import { generateSearchQueries, QueryGenInput, researchEmptyEditalTopics, beautifyMaterialTitle } from "@/lib/services/research/web-research";
+import { htmlToMarkdown } from "@/lib/services/ingestion/markdown-converter";
+import { scrapeSearchResults, calculateAuthorityScore } from "@/lib/services/research/garimpo-scraper";
+import { generateAIContent } from "@/lib/services/ai/ai-service";
 import { ActionResponse, actionError, actionSuccess, IdSchema } from "./types";
 import { createNotification } from "./notifications";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { extractStructuredText } from "@/lib/pdf-extractor";
+import { extractStructuredText } from "@/lib/services/ingestion/pdf-extractor";
 import {
   analyzeEditalMetadata,
   checkExistingEdital,
@@ -370,7 +370,7 @@ export async function addMaterial(formData: FormData): Promise<ActionResponse<{ 
 
     // STEP: Surgical RAG - Chunking and Vectorization
     if (content && content.trim().length > 0) {
-      const { chunkMarkdown, getEmbedding, classifyChunk } = await import("@/lib/ai-optimizations");
+      const { chunkMarkdown, getEmbedding, classifyChunk } = await import("@/lib/services/ai/ai-optimizations");
       const chunks = chunkMarkdown(content);
 
       // Process chunks in parallel batches to speed up ingestion
@@ -489,7 +489,7 @@ export async function getContextualNotes(
   limit: number = 5
 ) {
   try {
-    const { getEmbedding } = await import("@/lib/ai-optimizations");
+    const { getEmbedding } = await import("@/lib/services/ai/ai-optimizations");
     const queryEmbedding = await getEmbedding(query);
 
     if (!queryEmbedding) return { success: false, chunks: [] };
@@ -931,7 +931,7 @@ export async function importWebMaterials(webSourceIds: string[]) {
 
         // STEP: Surgical RAG - Chunking and Vectorization
         if (source.markdownContent) {
-          const { chunkMarkdown, getEmbedding, classifyChunk } = await import("@/lib/ai-optimizations");
+          const { chunkMarkdown, getEmbedding, classifyChunk } = await import("@/lib/services/ai/ai-optimizations");
           const chunks = chunkMarkdown(source.markdownContent);
           
           // Process chunks in parallel batches to speed up ingestion

@@ -3,7 +3,7 @@ import Firecrawl from '@mendable/firecrawl-js';
 const apiKey = process.env.FIRECRAWL_API_KEY;
 const firecrawl = new Firecrawl({ apiKey: apiKey || "" });
 
-import { tokenizer, type ProcessedChunk } from './text-processor';
+import { tokenizer, type ProcessedChunk } from '../infrastructure/text-processor';
 
 /**
  * SERVIÇO: Orquestrador de Raspagem Inteligente (Web Research)

@@ -13,7 +13,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, ilike, or, and } from "drizzle-orm";
 import { ActionResponse, actionError, actionSuccess } from "./types";
-import { generateAIContent } from "@/lib/ai-service";
+import { generateAIContent } from "@/lib/services/ai/ai-service";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -332,7 +332,7 @@ export async function parseAndIndexEdital(benchId: string, fullText: string, met
         content: parsed.markdown,
       }).returning();
 
-      const { chunkMarkdown, getEmbedding, classifyChunk } = await import("@/lib/ai-optimizations");
+      const { chunkMarkdown, getEmbedding, classifyChunk } = await import("@/lib/services/ai/ai-optimizations");
       const chunks = chunkMarkdown(parsed.markdown);
       
       for (const chunk of chunks) {

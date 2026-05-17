@@ -146,7 +146,7 @@ export async function updateAnotacaoContent(materialId: string, content: string,
                 .returning();
 
             if (plainText.trim().length > 0) {
-                const { chunkMarkdown, getEmbedding, classifyChunk } = await import("@/lib/ai-optimizations");
+                const { chunkMarkdown, getEmbedding, classifyChunk } = await import("@/lib/services/ai/ai-optimizations");
                 
                 // Fallback para chunkMarkdown se o parser de nodes falhou ou não retornou nada
                 const chunksToProcess = intelligentChunks.length > 0 ? intelligentChunks : chunkMarkdown(plainText);

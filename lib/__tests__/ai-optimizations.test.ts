@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { chunkMarkdown, calculateSimulatedSimilarity, getEmbedding } from '@/lib/ai-optimizations';
+import { chunkMarkdown, calculateSimulatedSimilarity, getEmbedding } from '@/lib/services/ai/ai-optimizations';
 
 // Mock do GoogleGenAI
 vi.mock('@google/genai', () => {

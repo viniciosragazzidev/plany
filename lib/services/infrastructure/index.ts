@@ -1,4 +1,4 @@
-import { scrapeUrlToMarkdown } from './web-scraper';
+import { scrapeUrlToMarkdown } from '../research/firecrawl-scraper';
 import { tokenizer, type ProcessedChunk } from './text-processor';
 
 /**
@@ -34,5 +34,5 @@ export async function captureAndTokenizeWebPage(url: string): Promise<WebCapture
 }
 
 // Re-exporta tipos e funções individuais para flexibilidade
-export * from './web-scraper';
+export * from '../research/firecrawl-scraper';
 export * from './text-processor';

@@ -10,8 +10,8 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, desc, sql, lte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { generateAIContent } from "@/lib/ai-service";
-import { getEmbedding } from "@/lib/ai-optimizations";
+import { generateAIContent } from "@/lib/services/ai/ai-service";
+import { getEmbedding } from "@/lib/services/ai/ai-optimizations";
 
 /**
  * Gera Flashcards usando RAG (Busca Cirúrgica)

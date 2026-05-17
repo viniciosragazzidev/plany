@@ -37,12 +37,12 @@ vi.mock('../../db', () => {
 });
 
 // Mock do AI Optimizations
-vi.mock('../../ai-optimizations', () => ({
+vi.mock('../../services/ai/ai-optimizations', () => ({
   getEmbedding: vi.fn().mockResolvedValue(new Array(3072).fill(0)),
 }));
 
 // Mock do AI Service
-vi.mock('@/lib/ai-service', () => ({
+vi.mock('@/lib/services/ai/ai-service', () => ({
   generateAIContent: vi.fn().mockResolvedValue({
     text: JSON.stringify({
       flashcards: [

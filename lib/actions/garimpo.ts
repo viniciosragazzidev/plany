@@ -5,8 +5,8 @@ import { studyBenches, editalItems, subjects, publicEditais, publicSubjects, pub
 import { eq, count, and, or } from "drizzle-orm";
 import crypto from "crypto";
 import { actionSuccess, actionError, ActionResponse } from "./types";
-import { researchEmptyEditalTopics } from "@/lib/web-research";
-import { scrapeSearchResults } from "@/lib/web-scraper";
+import { researchEmptyEditalTopics } from "@/lib/services/research/web-research";
+import { scrapeSearchResults } from "@/lib/services/research/garimpo-scraper";
 import { revalidatePath } from "next/cache";
 
 export type GarimpoScenario = "A" | "B" | "C";
