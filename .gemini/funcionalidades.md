@@ -167,8 +167,29 @@ A infraestrutura que permite capturar páginas da web e formatá-las estritament
 
 *   **Referências de Código:**
     *   Camada de Orquestração: [index.ts](file:///c:/Users/kyper/Desktop/Projects/plany/lib/services/infrastructure/index.ts)
-    *   Micro-Serviço Web Scraper: [web-scraper.ts](file:///c:/Users/kyper/Desktop/Projects/plany/lib/services/infrastructure/web-scraper.ts)
+    *   Micro-Serviço Web Scraper (Firecrawl v4): [web-scraper.ts](file:///c:/Users/kyper/Desktop/Projects/plany/lib/services/infrastructure/web-scraper.ts)
     *   Micro-Serviço Tokenizer: [text-processor.ts](file:///c:/Users/kyper/Desktop/Projects/plany/lib/services/infrastructure/text-processor.ts)
+    *   Action de Ingestão Atômica: [ingestWebMaterialAction](file:///c:/Users/kyper/Desktop/Projects/plany/lib/actions/materials.ts)
+
+---
+
+## 10. Módulo: Configurações & Personalização (Persona AI)
+
+Módulo central de gestão de perfil e preferências de interface, permitindo que o aluno calibre o comportamento do sistema e da IA.
+
+*   **O que faz por baixo dos panos:**
+    1.  Gerencia a tabela satélite `user_settings` vinculada ao usuário via Drizzle.
+    2.  **Calibragem de Persona:** Permite selecionar perfis (Concurseiro, Universitário, etc.), o que altera dinamicamente o *System Prompt* e a prioridade de busca do Garimpo.
+    3.  **Acessibilidade Visual:** Injeta atributos de dados (`data-font-size`) e temas (via `next-themes`) para feedback visual imediato (0ms) sem recarregar a página.
+    4.  **Gestão de Notificações:** Controla os gatilhos de alertas para revisões SM-2 e radar de novos editais.
+
+*   **Exemplo de Uso pelo Cliente:**
+    O aluno acessa a aba "Perfil & Persona" e altera seu nível para "Concurseiro". Imediatamente, o Chat do PLANY passa a adotar um tom mais focado em legislação e jurisprudência, e o tamanho da fonte de todo o sistema aumenta para 18px (XL) conforme sua preferência de leitura.
+
+*   **Referências de Código:**
+    *   Server Actions de Configurações: [settings.ts](file:///c:/Users/kyper/Desktop/Projects/plany/lib/actions/settings.ts)
+    *   Interface de Usuário: [settings-form.tsx](file:///c:/Users/kyper/Desktop/Projects/plany/app/dashboard/settings/components/settings-form.tsx)
+    *   Esquema de Dados: [userSettings](file:///c:/Users/kyper/Desktop/Projects/plany/lib/db/schema.ts)
 
 ---
 *Este mapa operacional foi estruturado em 17 de Maio de 2026 para documentar detalhadamente todas as pontas do ecossistema de funcionalidades do PLANY.*

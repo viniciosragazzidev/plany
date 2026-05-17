@@ -19,6 +19,7 @@ import {
     DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import Image from "next/image";
+import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -74,13 +75,17 @@ export default function SidebarDashboard() {
                     <span className="text-xs text-muted-foreground">{session?.user?.email}</span>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="gap-2">
-                    <HugeiconsIcon icon={UserCircleIcon} size={16} />
-                    Perfil
+                <DropdownMenuItem className="gap-2" asChild>
+                    <Link href="/dashboard/settings?tab=profile">
+                        <HugeiconsIcon icon={UserCircleIcon} size={16} />
+                        Perfil
+                    </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem className="gap-2">
-                    <HugeiconsIcon icon={Settings02Icon} size={16} />
-                    Configurações
+                <DropdownMenuItem className="gap-2" asChild>
+                    <Link href="/dashboard/settings">
+                        <HugeiconsIcon icon={Settings02Icon} size={16} />
+                        Configurações
+                    </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <div className="flex items-center justify-between px-2 py-1.5 focus:bg-accent focus:text-accent-foreground outline-none transition-colors">

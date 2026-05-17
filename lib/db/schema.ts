@@ -139,6 +139,17 @@ export const materials = pgTable("materials", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const userSettings = pgTable("user_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull().unique().references(() => user.id, { onDelete: "cascade" }),
+  persona: studentLevelEnum("persona").default("concurseiro").notNull(),
+  theme: text("theme", { enum: ["light", "dark", "system"] }).default("system").notNull(),
+  fontSize: text("font_size", { enum: ["sm", "base", "lg", "xl"] }).default("base").notNull(),
+  notifySM2: boolean("notify_sm2").default(true).notNull(),
+  notifyNewEditais: boolean("notify_new_editais").default(true).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // --- Public Caching System ---
 
 export const publicEditais = pgTable("public_editais", {
