@@ -827,52 +827,54 @@ export async function importWebMaterials(webSourceIds: string[]) {
         let subjectId: string | null = null;
         let editalItemId: string | null = null;
 
-        // 1. Try to find the exact edital item
+        // --- ENHANCED MATCHING LOGIC ---
+        // Helper to normalize strings (remove numbering like '1.', '1.1', extra spaces)
+        const normalize = (s: string) => s.toLowerCase()
+          .replace(/^[\d\.]+\s+/, "") // Remove numbering
+          .replace(/[^\w\sÀ-ú]/gi, "") // Remove special characters
+          .trim();
+
         // source.topic is usually "Category: Topic Name"
         const topicParts = source.topic.split(": ");
-        const categoryPart = topicParts[0].toLowerCase();
-        const topicPart = topicParts[1]?.toLowerCase() || source.topic.toLowerCase();
+        const categoryPartNormalized = normalize(topicParts[0]);
+        const topicPartNormalized = normalize(topicParts[1] || source.topic);
 
+        // 1. Try to find the exact edital item with enhanced normalization
         const matchedItem = benchEditalItems.find(item => {
-          const itemCat = item.category.toLowerCase().trim();
-          const itemTop = item.topic.toLowerCase().trim();
+          const itemCatNorm = normalize(item.category);
+          const itemTopNorm = normalize(item.topic);
 
-          // Strict match: Category and Topic must align with what was searched
-          return (itemCat === categoryPart && itemTop === topicPart) ||
-            (itemTop === topicPart);
+          // Tiered matching strategy
+          return (itemCatNorm === categoryPartNormalized && itemTopNorm === topicPartNormalized) ||
+                 (itemTopNorm === topicPartNormalized) ||
+                 (topicPartNormalized.length > 5 && itemTopNorm.includes(topicPartNormalized)) ||
+                 (itemTopNorm.length > 5 && topicPartNormalized.includes(itemTopNorm));
         });
 
         if (matchedItem) {
+          console.log(`[Import] Matched topic: "${source.topic}" -> ${matchedItem.topic} (ID: ${matchedItem.id})`);
           editalItemId = matchedItem.id;
-
-          // 2. Map subject from matched edital item category
-          // Exact match is safer than .includes() to avoid 'Matematica' matching 'Matematica Financeira'
-          const matchedSubject = benchSubjects.find(s =>
-            s.title.toLowerCase().trim() === matchedItem.category.toLowerCase().trim()
+          
+          // Map subject from matched item
+          const matchedSubject = benchSubjects.find(s => 
+            normalize(s.title) === normalize(matchedItem.category) ||
+            normalize(matchedItem.category).includes(normalize(s.title))
           );
-
-          if (matchedSubject) {
-            subjectId = matchedSubject.id;
-          } else {
-            // Partial match fallback only if very similar
-            const partialMatch = benchSubjects.find(s =>
-              matchedItem.category.toLowerCase().includes(s.title.toLowerCase()) &&
-              (matchedItem.category.length - s.title.length < 5) // Strict threshold
-            );
-            if (partialMatch) subjectId = partialMatch.id;
-          }
+          if (matchedSubject) subjectId = matchedSubject.id;
         }
 
-        // 3. Fallback: Try to match subject directly from source topic or category if not found
+        // 2. Fallback: If no item matched, at least try to match the subject precisely
         if (!subjectId) {
-          const matchedSubject = benchSubjects.find(s =>
-            s.title.toLowerCase().trim() === categoryPart ||
-            (categoryPart.includes(s.title.toLowerCase()) && (categoryPart.length - s.title.length < 5))
+          const matchedSubject = benchSubjects.find(s => 
+            categoryPartNormalized === normalize(s.title) ||
+            categoryPartNormalized.includes(normalize(s.title)) || 
+            normalize(s.title).includes(categoryPartNormalized)
           );
+          if (matchedSubject) subjectId = matchedSubject.id;
+        }
 
-          if (matchedSubject) {
-            subjectId = matchedSubject.id;
-          }
+        if (!editalItemId) {
+          console.warn(`[Import] No topic match for: "${source.topic}". Falling back to subject: ${subjectId || 'None'}`);
         }
 
         const [material] = await db
