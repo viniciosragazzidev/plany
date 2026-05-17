@@ -56,18 +56,18 @@ export async function selectPublicEdital(benchId: string, publicEditalId: string
     if (!publicEdital) return actionError("Edital público não encontrado");
 
     await db.transaction(async (tx) => {
-      // Use contest name for goalName if available, otherwise format from institution/role
-      // For legacy records, we'll try to reconstruct a pretty name from the slug
-      const prettyName = publicEdital.slugName.split('-').join(' ');
+      // Use premium contestName for goalName if available, otherwise fall back to pretty slug
+      const goalName = publicEdital.contestName || publicEdital.slugName.split('-').join(' ');
 
       // 1. Update bench metadata
       await tx.update(studyBenches)
         .set({
-          goalName: prettyName,
+          goalName: goalName,
           publicEditalId: publicEdital.id,
           hasDiscoveredTopics: true
         })
         .where(eq(studyBenches.id, benchId));
+
 
       // 2. Clone subjects and topics
       for (const pSubject of publicEdital.subjects) {
@@ -202,6 +202,37 @@ export async function checkExistingEdital(metadata: { institution: string, role:
 }
 
 /**
+ * Fetches the structure of a public edital for UI preview.
+ */
+export async function getPublicEditalStructure(publicEditalId: string): Promise<ActionResponse<{ subjects: string[], editalItems: any[] }>> {
+  try {
+    const publicEdital = await db.query.publicEditais.findFirst({
+      where: eq(publicEditais.id, publicEditalId),
+      with: {
+        subjects: {
+          with: {
+            topics: true
+          }
+        }
+      }
+    });
+
+    if (!publicEdital) return actionError("Edital público não encontrado");
+
+    const subjects = publicEdital.subjects.map(s => s.name);
+    const editalItems = publicEdital.subjects.flatMap(s => s.topics.map(t => ({
+      category: s.name,
+      topic: t.name,
+      weight: 1
+    })));
+
+    return actionSuccess({ subjects, editalItems });
+  } catch (error: any) {
+    return actionError(error.message);
+  }
+}
+
+/**
  * Phase 4: Full Parsing & Public Indexing
  */
 export async function parseAndIndexEdital(benchId: string, fullText: string, metadata: { institution: string, role: string, year: string, contestName: string }, fileHash: string): Promise<ActionResponse<void>> {
@@ -238,17 +269,19 @@ export async function parseAndIndexEdital(benchId: string, fullText: string, met
     const slugName = baseForSlug.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
 
     await db.transaction(async (tx) => {
-      // 1. Create Public Edital
+      // 1. Create Public Edital record
       const [pEdital] = await tx.insert(publicEditais).values({
         slugName,
+        contestName: metadata.contestName,
         institution: metadata.institution,
         role: metadata.role,
         year: metadata.year,
         fileHash
       }).returning();
 
-      // 2. Index Subjects and Topics Publicly
+      // 2. Index Globally and Clone Privately in a unified way
       for (const sub of parsed.subjects) {
+        // A. Public Indexing
         const [pSub] = await tx.insert(publicSubjects).values({
           publicEditalId: pEdital.id,
           name: sub.name
@@ -260,21 +293,8 @@ export async function parseAndIndexEdital(benchId: string, fullText: string, met
             name: top
           });
         }
-      }
 
-      // 3. Update User Bench with Markdown
-      await tx.update(studyBenches)
-        .set({ 
-          examNotice: parsed.markdown,
-          publicEditalId: pEdital.id,
-          goalName: metadata.contestName || `${metadata.institution} - ${metadata.role} (${metadata.year})`,
-          hasDiscoveredTopics: true,
-          researchStatus: "idle"
-        })
-        .where(eq(studyBenches.id, benchId));
-
-      // 4. Clone to User Private Space
-      for (const sub of parsed.subjects) {
+        // B. Private Cloning for the current user
         const [newSub] = await tx.insert(subjects).values({
           benchId,
           title: sub.name,
@@ -293,7 +313,18 @@ export async function parseAndIndexEdital(benchId: string, fullText: string, met
         }
       }
 
-      // 5. Create "Edital Oficial" material for RAG
+      // 3. Update User Bench with Markdown and Link
+      await tx.update(studyBenches)
+        .set({ 
+          examNotice: parsed.markdown,
+          publicEditalId: pEdital.id,
+          goalName: metadata.contestName || `${metadata.institution} - ${metadata.role} (${metadata.year})`,
+          hasDiscoveredTopics: true,
+          researchStatus: "idle"
+        })
+        .where(eq(studyBenches.id, benchId));
+
+      // 4. Create "Edital Oficial" material for RAG
       const [editalMaterial] = await tx.insert(materials).values({
         benchId,
         title: "Edital Oficial",

@@ -157,7 +157,7 @@ Idioma: Português do Brasil.`;
 
     try {
       const aiResponse = await generateAIContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         contents: messages.map((m) => ({
           role: m.role === "assistant" ? "model" : m.role,
           parts: [{ text: m.content }],

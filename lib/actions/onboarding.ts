@@ -207,6 +207,7 @@ export async function createStudyBench(data: {
 
 /**
  * Helper to index a new public edital without AI re-parsing.
+ * This is used when a user uploads a new PDF during onboarding.
  */
 async function indexNewPublicEdital(
   metadata: { institution: string, role: string, year: string, contestName: string },
@@ -215,18 +216,20 @@ async function indexNewPublicEdital(
   topicsData: { category: string; topic: string }[]
 ) {
   try {
+    console.log(`[indexNewPublicEdital] Inserindo novo edital na biblioteca: ${metadata.contestName}`);
+    
     // 1. SECONDARY CHECK: Before indexing, check if it exists (Atomic-ish)
     const existingId = await checkExistingEdital(metadata, fileHash);
     if (existingId) {
         console.log(`[indexNewPublicEdital] Skipping duplicate index for: ${metadata.contestName}`);
-        return;
+        return existingId;
     }
 
     const baseForSlug = metadata.contestName || `${metadata.institution} ${metadata.role} ${metadata.year}`;
     const slugName = baseForSlug.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
 
-    await db.transaction(async (tx) => {
-      // 1. Create Public Edital
+    const publicId = await db.transaction(async (tx) => {
+      // 1. Create Public Edital record
       const [pEdital] = await tx.insert(publicEditais).values({
         slugName,
         contestName: metadata.contestName,
@@ -236,8 +239,7 @@ async function indexNewPublicEdital(
         fileHash
       }).returning();
 
-
-      // 2. Index Subjects and Topics
+      // 2. Index Subjects and Topics in the public tables
       for (const sub of subjectsData) {
         const [pSub] = await tx.insert(publicSubjects).values({
           publicEditalId: pEdital.id,
@@ -252,9 +254,13 @@ async function indexNewPublicEdital(
           });
         }
       }
+      return pEdital.id;
     });
+
+    console.log(`[indexNewPublicEdital] Sucesso ao indexar: ${publicId}`);
+    return publicId;
   } catch (err) {
     console.error("Failed to index new public edital in background:", err);
-    // Non-blocking for the user
+    return null;
   }
 }

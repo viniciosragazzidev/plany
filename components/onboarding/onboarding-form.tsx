@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 import { completeOnboarding, createStudyBench } from "@/lib/actions/onboarding";
 import { extractBenchDataFromEdital } from "@/lib/actions/bench";
 import { garimparFormTopics } from "@/lib/actions/garimpo";
-import { searchPublicEditais, selectPublicEdital } from "@/lib/actions/public-edital";
+import { searchPublicEditais, selectPublicEdital, getPublicEditalStructure } from "@/lib/actions/public-edital";
 import { useThrottledCallback } from "@/hooks/use-throttled-callback";
 import { Logo } from "@/components/ui/logo";
 import { parseISO, isValid, parse } from "date-fns";
@@ -105,18 +105,40 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
     handleSearch(searchQuery);
   }, [searchQuery, handleSearch]);
 
-  const handleSelectPublic = (edital: any) => {
+  const handleSelectPublic = async (edital: any) => {
     setFormData(prev => ({
       ...prev,
-      goalName: `${edital.institution} - ${edital.role}`,
+      goalName: edital.contestName || `${edital.institution} - ${edital.role}`,
       examBoard: edital.institution,
       publicEditalId: edital.id
     }));
     setSearchQuery("");
     setSearchResults([]);
-    toast.success("Edital público selecionado!", {
-      description: "As matérias serão importadas automaticamente ao finalizar."
-    });
+
+    const loadingToast = toast.loading("Importando estrutura do edital...");
+    
+    try {
+      const res = await getPublicEditalStructure(edital.id);
+      if (res.success && res.data) {
+        setFormData(prev => ({
+          ...prev,
+          subjects: res.data.subjects.map((s: string) => ({
+            title: s,
+            priority: 3,
+            colorTag: "#3b82f6"
+          })),
+          editalItems: res.data.editalItems
+        }));
+        toast.success("Estrutura importada com sucesso!", { id: loadingToast });
+        
+        // Auto-advance if in onboarding
+        if (mode === "onboarding") setStep(3);
+      } else {
+        toast.error("Erro ao carregar estrutura: " + res.error, { id: loadingToast });
+      }
+    } catch (err) {
+      toast.error("Falha na importação instantânea.", { id: loadingToast });
+    }
   };
 
   const handleMagicImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
