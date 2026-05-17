@@ -1,18 +1,26 @@
 'use server'
 
 import { db } from "@/lib/db";
-import { studyBenches, editalItems, materials, subjects, webSources, materialChunks } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { studyBenches, editalItems, materials, subjects, webSources, materialChunks, quizzes } from "@/lib/db/schema";
+import { eq, sql, and, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-// @ts-expect-error: pdf-parse-fork lacks type definitions
-import pdf from 'pdf-parse-fork';
-import { GoogleGenAI } from "@google/genai";
+
 import { generateSearchQueries, QueryGenInput, researchEmptyEditalTopics, beautifyMaterialTitle } from "@/lib/web-research";
 import { htmlToMarkdown } from "@/lib/markdown-converter";
 import { scrapeSearchResults, calculateAuthorityScore } from "@/lib/web-scraper";
-
-const apiKey = process.env.GEMINI_API_KEY;
-const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+import { generateAIContent } from "@/lib/ai-service";
+import { ActionResponse, actionError, actionSuccess, IdSchema } from "./types";
+import { createNotification } from "./notifications";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { extractStructuredText } from "@/lib/pdf-extractor";
+import { 
+  analyzeEditalMetadata, 
+  checkExistingEdital, 
+  selectPublicEdital, 
+  parseAndIndexEdital 
+} from "./public-edital";
+import crypto from "crypto";
 
 export async function processEditalPDF(formData: FormData): Promise<ActionResponse<{ topicCount: number }>> {
   const file = formData.get("file") as File;
@@ -23,128 +31,47 @@ export async function processEditalPDF(formData: FormData): Promise<ActionRespon
   }
 
   try {
+    console.log("[processEditalPDF] Iniciando novo fluxo de Garimpo...");
+    const t0 = Date.now();
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const data = await pdf(buffer);
-    const rawText = data.text;
-
-    // STEP 3: Mandatory PDF-to-MD Conversion for RAG
-    const mdSystemPrompt = `Você é um Analista Acadêmico especializado em conversão de documentos.
-    Sua missão é converter o texto bruto de um edital em Markdown estruturado de alta qualidade.
-    - Preserve headers (# para títulos principais, ## para sub-tópicos)
-    - Formate tabelas de cronogramas e critérios de pontuação
-    - Preserve listas de conteúdo programático
-    - Remova ruídos de metadados do PDF (números de página soltos, cabeçalhos repetidos)
-    - Retorne apenas o Markdown.`;
-
-    const mdResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [{ role: "user", parts: [{ text: `TEXTO BRUTO PARA CONVERTER:\n${rawText.substring(0, 25000)}` }] }],
-      config: {
-        systemInstruction: {
-          parts: [{ text: mdSystemPrompt }]
-        }
-      }
-    });
-
-    const editalMarkdown = mdResponse.text;
-    if (!editalMarkdown) throw new Error("Falha na conversão para Markdown");
-
-    // STEP 4: Extract structured topics from the Markdown + Metadata
-    const extractSystemPrompt = `Você é um Analista Acadêmico especializado em extração de dados estruturados.
-    Sua missão é extrair o CONTEÚDO PROGRAMÁTICO e METADADOS de editais em Markdown.
     
-    Retorne APENAS um JSON válido no seguinte formato:
-    {
-      "metadata": {
-        "goalName": "Nome do Concurso",
-        "examBoard": "Banca (ex: FGV, CESPE, Vunesp)",
-        "targetDate": "YYYY-MM-DD"
-      },
-      "items": [
-        { "category": "Nome da Disciplina", "topic": "Nome do Tópico", "description": "Breve detalhamento se houver", "weight": 1-5 }
-      ]
-    }`;
+    // Calculate File Hash for deduplication
+    const fileHash = crypto.createHash('md5').update(buffer).digest('hex');
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [{ role: "user", parts: [{ text: `EDITAL EM MARKDOWN:\n${editalMarkdown}` }] }],
-      config: {
-        systemInstruction: {
-          parts: [{ text: extractSystemPrompt }]
-        }
-      }
-    });
+    console.log("[processEditalPDF] Extraindo texto estruturado localmente...");
+    const structuredText = await extractStructuredText(buffer);
 
-    const text = response.text;
-    if (!text) throw new Error("A IA não retornou uma resposta válida.");
-    
-    // Clean JSON response
-    const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const { metadata, items } = JSON.parse(jsonStr);
+    // Phase 2: AI Metadata Extraction (Lightweight)
+    console.log("[processEditalPDF] Phase 2: Extraindo metadados...");
+    const metadataRes = await analyzeEditalMetadata(structuredText);
+    if (!metadataRes.success || !metadataRes.data) {
+      throw new Error(metadataRes.error || "Falha ao extrair metadados do edital");
+    }
+    const metadata = metadataRes.data;
 
-    // Save to database
-    await db.transaction(async (tx) => {
-      // 1. Update bench with the HIGH-QUALITY MARKDOWN and Metadata
-      const currentBench = await tx.query.studyBenches.findFirst({
-        where: eq(studyBenches.id, benchId)
-      });
+    // Phase 3: Secondary Deduplication Check
+    console.log("[processEditalPDF] Phase 3: Checando duplicatas...");
+    const existingId = await checkExistingEdital(metadata);
 
-      await tx.update(studyBenches)
-        .set({ 
-          examNotice: editalMarkdown,
-          goalName: currentBench?.goalName || metadata.goalName,
-          examBoard: currentBench?.examBoard || metadata.examBoard,
-          targetDate: currentBench?.targetDate || metadata.targetDate
-        }) 
-        .where(eq(studyBenches.id, benchId));
+    if (existingId) {
+      console.log("[processEditalPDF] Cache Hit! Vinculando edital existente...");
+      const selectRes = await selectPublicEdital(benchId, existingId);
+      if (!selectRes.success) throw new Error(selectRes.error);
+      
+      return actionSuccess({ topicCount: 0 }, "Edital encontrado na biblioteca e vinculado com sucesso!");
+    }
 
-      // 3. Insert new items
-      if (items && items.length > 0) {
-        for (const item of items) {
-          await tx.insert(editalItems).values({
-            benchId,
-            category: item.category,
-            topic: item.topic,
-            description: item.description,
-            weight: item.weight || 1,
-          });
-        }
-      }
+    // Phase 4: Full Parsing & Public Indexing
+    console.log("[processEditalPDF] Phase 4: Parsing completo e indexação pública...");
+    const indexRes = await parseAndIndexEdital(benchId, structuredText, metadata, fileHash);
+    if (!indexRes.success) throw new Error(indexRes.error);
 
-      // STEP: Save Edital as a Vectorized Material for RAG
-      const [editalMaterial] = await tx.insert(materials).values({
-        benchId,
-        title: "Edital Oficial",
-        type: "text",
-        content: editalMarkdown,
-      }).returning();
-
-      const { chunkMarkdown, getEmbedding, classifyChunk } = await import("@/lib/ai-optimizations");
-      const chunks = chunkMarkdown(editalMarkdown);
-      for (const chunk of chunks) {
-        const [embedding, originTag] = await Promise.all([
-          getEmbedding(chunk),
-          classifyChunk(chunk)
-        ]);
-
-        if (embedding) {
-          await tx.insert(materialChunks).values({
-            materialId: editalMaterial.id,
-            content: chunk,
-            embedding,
-            subjectId: editalMaterial.subjectId,
-            topicId: editalMaterial.editalItemId,
-            originTag
-          });
-        }
-      }
-    });
-
+    console.log(`[processEditalPDF] Fluxo concluído em ${Date.now() - t0}ms`);
     revalidatePath(`/dashboard/bancadas/${benchId}`);
-    return actionSuccess({ topicCount: items?.length || 0 }, "Edital processado com sucesso");
+    return actionSuccess({ topicCount: 0 }, "Edital processado, indexado e vinculado!");
   } catch (error: any) {
-    console.error("Erro ao processar Edital:", error);
+    console.error("Erro no fluxo de Garimpo:", error);
     return actionError(error.message);
   }
 }
@@ -157,39 +84,26 @@ export async function extractBenchDataFromEdital(formData: FormData) {
   }
 
   try {
+    console.log("[extractBenchDataFromEdital] Iniciando extração nativa...");
+    const t0 = Date.now();
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const data = await pdf(buffer);
-    const rawText = data.text;
+    
+    console.log("[extractBenchDataFromEdital] Extraindo texto estruturado localmente via pdfjs-dist...");
+    const tExtract = Date.now();
+    const structuredText = await extractStructuredText(buffer);
+    console.log(`[extractBenchDataFromEdital] Texto extraído localmente em ${Date.now() - tExtract}ms`);
 
-    // STEP 1: Conversion to High-Quality Markdown for RAG/Consultant
-    const mdSystemPrompt = `Você é um Analista Acadêmico especializado em conversão de documentos.
-    Sua missão é converter o texto bruto de um edital em Markdown estruturado de alta qualidade.
-    - Preserve headers (# para títulos principais, ## para sub-tópicos)
-    - Formate tabelas de cronogramas e critérios de pontuação
-    - Preserve listas de conteúdo programático
-    - Remova ruídos de metadados do PDF
-    - Retorne apenas o Markdown.`;
-
-    const mdResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [{ role: "user", parts: [{ text: `TEXTO BRUTO PARA CONVERTER:\n${rawText.substring(0, 25000)}` }] }],
-      config: {
-        systemInstruction: {
-          parts: [{ text: mdSystemPrompt }]
-        }
-      }
-    });
-
-    const editalMarkdown = mdResponse.text;
-    if (!editalMarkdown) throw new Error("Falha na conversão para Markdown");
-
-    // STEP 2: Extraction of Metadata AND Structured Topics
+    // SINGLE AI CALL: Native PDF -> Markdown + JSON
+    console.log("[extractBenchDataFromEdital] Enviando texto estruturado para Gemini...");
+    const t1 = Date.now();
     const extractSystemPrompt = `Você é um Analista Acadêmico especializado em extração de dados estruturados.
-    Sua missão é extrair o CONTEÚDO PROGRAMÁTICO e METADADOS de editais para configurar um plano de estudos.
+    Sua missão é extrair o CONTEÚDO PROGRAMÁTICO e METADADOS do texto estruturado do edital fornecido para configurar um plano de estudos.
+    Você também deve converter o texto do edital para um Markdown estruturado de alta qualidade (removendo ruídos de páginas, formatando tabelas e listas).
     
     Retorne APENAS um JSON válido no seguinte formato:
     {
+      "markdown": "Todo o conteúdo do edital convertido para Markdown limpo e estruturado.",
       "metadata": {
         "goalName": "Nome do Concurso",
         "examBoard": "Banca (ex: FGV, CESPE, Vunesp)",
@@ -202,32 +116,43 @@ export async function extractBenchDataFromEdital(formData: FormData) {
       ]
     }`;
 
-    const response = await ai.models.generateContent({
+    const response = await generateAIContent({
       model: "gemini-2.5-flash",
-      contents: [{ role: "user", parts: [{ text: `EDITAL EM MARKDOWN:\n${editalMarkdown}` }] }],
+      contents: [{ 
+        role: "user", 
+        parts: [
+          { text: `TEXTO ESTRUTURADO DO EDITAL:\n\n${structuredText.substring(0, 100000)}` }
+        ] 
+      }],
+      forceCloud: true,
       config: {
-        systemInstruction: {
-          parts: [{ text: extractSystemPrompt }]
-        }
+        systemInstruction: { parts: [{ text: extractSystemPrompt }] },
+        responseMimeType: "application/json"
       }
     });
 
     const text = response.text;
+    console.log(`[extractBenchDataFromEdital] IA concluiu em ${Date.now() - t1}ms`);
     if (!text) throw new Error("A IA não retornou uma resposta válida.");
     
     const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const { metadata, subjects, items } = JSON.parse(jsonStr);
+    const parsedData = JSON.parse(jsonStr);
+    const metadata = parsedData.metadata || {};
+    const subjects = parsedData.subjects || [];
+    const items = parsedData.items || [];
+    const markdown = parsedData.markdown || "";
 
+    console.log(`[extractBenchDataFromEdital] Tempo TOTAL: ${Date.now() - t0}ms`);
     return { 
       success: true, 
       data: {
-        goalName: metadata.goalName,
-        examBoard: metadata.examBoard,
-        targetDate: metadata.targetDate,
-        weeklyHours: metadata.weeklyHours || 20,
+        goalName: metadata?.goalName,
+        examBoard: metadata?.examBoard,
+        targetDate: metadata?.targetDate,
+        weeklyHours: metadata?.weeklyHours || 20,
         subjects: subjects || [],
         editalItems: items || [],
-        examNotice: editalMarkdown
+        examNotice: markdown
       } 
     };
   } catch (error: any) {
@@ -240,6 +165,7 @@ export async function deleteStudyBench(benchId: string) {
   try {
     await db.transaction(async (tx) => {
       // Delete related items first to avoid foreign key constraint violations
+      await tx.delete(quizzes).where(eq(quizzes.benchId, benchId));
       await tx.delete(webSources).where(eq(webSources.benchId, benchId));
       await tx.delete(materials).where(eq(materials.benchId, benchId));
       await tx.delete(editalItems).where(eq(editalItems.benchId, benchId));
@@ -277,10 +203,9 @@ export async function addMaterial(formData: FormData): Promise<ActionResponse<{ 
     if (type === "pdf" && file) {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
-      const data = await pdf(buffer);
-      const rawText = data.text;
+      const structuredText = await extractStructuredText(buffer);
 
-      // Convert PDF to MD and Suggest Subject
+      // Convert Structured Text to MD and Suggest Subject
       const existingSubjects = await db.query.subjects.findMany({
         where: eq(subjects.benchId, benchId)
       });
@@ -288,23 +213,28 @@ export async function addMaterial(formData: FormData): Promise<ActionResponse<{ 
 
       const mdSystemPrompt = `Você é um Analista Acadêmico especializado em conversão de materiais de estudo e classificação.
       Sua missão é:
-      1. Converter o texto bruto do material (PDF) em Markdown estruturado de alta qualidade.
+      1. Converter o texto estruturado do arquivo em Markdown de alta qualidade.
       2. Sugerir a qual destas disciplinas o material pertence: [${subjectsContext}]. 
          Se não encontrar uma correspondência clara, sugira "Outros".
       
       Retorne APENAS um JSON no formato:
       {
-        "content": "Markdown aqui...",
+        "content": "Markdown extraído do texto...",
         "suggestedSubject": "Título da Disciplina"
       }`;
 
-      const mdResponse = await ai.models.generateContent({
+      const mdResponse = await generateAIContent({
         model: "gemini-2.5-flash",
-        contents: [{ role: "user", parts: [{ text: `CONTEÚDO PARA PROCESSAR:\n${rawText.substring(0, 30000)}` }] }],
+        contents: [{ 
+          role: "user", 
+          parts: [
+            { text: `TEXTO ESTRUTURADO PARA CONVERTER:\n\n${structuredText.substring(0, 100000)}` }
+          ] 
+        }],
+        forceCloud: true,
         config: {
-          systemInstruction: {
-            parts: [{ text: mdSystemPrompt }]
-          }
+          systemInstruction: { parts: [{ text: mdSystemPrompt }] },
+          responseMimeType: "application/json"
         }
       });
 
@@ -371,6 +301,22 @@ export async function addMaterial(formData: FormData): Promise<ActionResponse<{ 
   } catch (error: any) {
     console.error("Erro ao adicionar material:", error);
     return actionError(error.message || "Erro ao adicionar material");
+  }
+}
+
+export async function deleteTopic(topicId: string) {
+  try {
+    const [item] = await db.delete(editalItems)
+      .where(eq(editalItems.id, topicId))
+      .returning();
+
+    if (item) {
+        revalidatePath(`/dashboard/bancadas/${item.benchId}`);
+    }
+    return { success: true };
+  } catch (error: any) {
+    console.error("Erro ao excluir tópico:", error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -465,9 +411,6 @@ export async function getContextualNotes(
   }
 }
 
-import { ActionResponse, actionError, actionSuccess, IdSchema } from "./types";
-import { and, desc } from "drizzle-orm";
-
 export async function deleteSubject(subjectId: string): Promise<ActionResponse<null>> {
   const validation = IdSchema.safeParse(subjectId);
   if (!validation.success) return actionError("ID inválido");
@@ -477,6 +420,7 @@ export async function deleteSubject(subjectId: string): Promise<ActionResponse<n
     if (!subject) return actionError("Disciplina não encontrada");
 
     await db.transaction(async (tx) => {
+      await tx.delete(quizzes).where(eq(quizzes.subjectId, subjectId));
       await tx.delete(materials).where(eq(materials.subjectId, subjectId));
       await tx.delete(subjects).where(eq(subjects.id, subjectId));
     });
@@ -562,17 +506,14 @@ export async function updateExamNotice(benchId: string, content: string) {
   revalidatePath(`/dashboard/bancadas/${benchId}`);
 }
 
-import { createNotification } from "./notifications";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-
 export async function performWebResearch(
   benchId: string,
   selectedSubjectIds?: string[],
-  targetCount: number = 3
+  targetCount: number = 3,
+  specificTopics?: string[]
 ) {
   try {
-    // Robust session check for Next.js 15/16
+    // ... (session check)
     let session;
     try {
         const currentHeaders = await headers();
@@ -597,10 +538,13 @@ export async function performWebResearch(
       .set({ researchStatus: "researching" })
       .where(eq(studyBenches.id, benchId));
     
-    // Get topics from edital strictly filtered by selected subjects
+    // Get topics from edital strictly filtered by selected subjects or specificTopics
     let topics: string[] = [];
 
-    if (selectedSubjectIds && selectedSubjectIds.length > 0) {
+    if (specificTopics && specificTopics.length > 0) {
+      // Use specifically selected topics (max precision)
+      topics = specificTopics;
+    } else if (selectedSubjectIds && selectedSubjectIds.length > 0) {
       // 1. Fetch the titles of the selected subjects
       const selectedSubjects = await db.query.subjects.findMany({
         where: (subjects, { and, eq, inArray }) => 
@@ -630,36 +574,6 @@ export async function performWebResearch(
           filteredEditalItems.map((item) => `${item.category}: ${item.topic}`)
         ),
       ];
-
-      // NOVO FLUXO: Se o edital foi importado (tem texto) MAS não tem conteúdo programático extraído
-      if (topics.length === 0 && bench.examNotice) {
-         // FASE DE PESQUISA PRÉVIA: Buscar na web o conteúdo programático real do concurso
-         let webContext = "";
-         try {
-            const syllabusQuery = `conteúdo programático edital ${bench.goalName} ${bench.examBoard || ""}`;
-            const syllabusScrap = await scrapeSearchResults(syllabusQuery, "Syllabus Research", 3);
-            webContext = syllabusScrap.map(s => s.markdownContent).join("\n\n---\n\n");
-         } catch (e) {
-            console.error("[Syllabus-Web] Erro ao pesquisar fontes externas:", e);
-         }
-
-         // Aciona a IA para "Pesquisar/Estipular" os tópicos vazios baseados no Edital + Fontes Web
-         const researchedTopics = await researchEmptyEditalTopics(bench.examNotice, webContext);
-         
-         // Filtra os tópicos pesquisados para manter apenas as matérias selecionadas
-         const filteredResearched = researchedTopics.filter(topicStr => {
-            const categoryPart = topicStr.split(':')[0]?.toLowerCase().trim() || "";
-            return subjectTitles.some(title => categoryPart.includes(title) || title.includes(categoryPart));
-         });
-
-         topics = filteredResearched;
-      }
-      
-      // NOVO FLUXO: Se não houver edital NENHUM importado
-      if (topics.length === 0 && !bench.examNotice) {
-         // O Garimpo deve procurar baseado apenas nos Assuntos (Títulos das Matérias)
-         topics = selectedSubjects.map(s => `${bench.goalName}: ${s.title}`);
-      }
     }
 
     if (topics.length === 0) {

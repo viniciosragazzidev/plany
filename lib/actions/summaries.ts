@@ -8,11 +8,8 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { GoogleGenAI } from "@google/genai";
+import { generateAIContent } from "@/lib/ai-service";
 import { createHash } from "crypto";
-
-const apiKey = process.env.GEMINI_API_KEY;
-const ai = new GoogleGenAI({ apiKey: apiKey || "" });
 
 function generateMaterialsHash(ids: string[]): string {
   return createHash("sha256").update(ids.sort().join(",")).digest("hex");
@@ -62,7 +59,7 @@ export async function generateSummaryAction(
       return { 
         success: true, 
         summary: existing, 
-        message: "Opa! Já preparei esse mapa de guerra pra você. Carregando a versão existente..." 
+        message: "Opa! Já preparei esse mapa de guerra pra você. Carregando a version existente..." 
       };
     }
 
@@ -109,7 +106,7 @@ export async function generateSummaryAction(
 
     Retorne APENAS o JSON válido.`;
 
-    const response = await ai.models.generateContent({
+    const response = await generateAIContent({
       model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: `CONTEÚDO BASE PARA O RESUMO:\n${contextText.substring(0, 40000)}` }] }],
       config: {

@@ -8,6 +8,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 
+import { ActionResponse, actionError, actionSuccess } from "./types";
+import { selectPublicEdital } from "./public-edital";
+
 export async function completeOnboarding(data: {
   name: string;
   studentLevel: "concurseiro" | "universitario" | "vestibulando" | "profissional";
@@ -19,6 +22,7 @@ export async function completeOnboarding(data: {
   editalItems?: { category: string; topic: string; description?: string; weight?: number }[];
   examBoard?: string;
   examNotice?: string;
+  publicEditalId?: string | null;
 }) {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -31,6 +35,7 @@ export async function completeOnboarding(data: {
   const userId = session.user.id;
 
   try {
+    let benchId = "";
     await db.transaction(async (tx) => {
       // 1. Criar Perfil
       const [profile] = await tx
@@ -53,8 +58,11 @@ export async function completeOnboarding(data: {
           weeklyHours: data.weeklyHours,
           examBoard: data.examBoard,
           examNotice: data.examNotice,
+          publicEditalId: data.publicEditalId,
         })
         .returning();
+      
+      benchId = bench.id;
 
       // 3. Criar Disciplinas
       if (data.subjects.length > 0) {
@@ -81,6 +89,11 @@ export async function completeOnboarding(data: {
         );
       }
     });
+
+    // 5. Se tiver publicEditalId e nenhuma matéria foi passada, clonar automaticamente
+    if (data.publicEditalId && data.subjects.length === 0) {
+      await selectPublicEdital(benchId, data.publicEditalId);
+    }
     
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/bancadas");
@@ -101,6 +114,7 @@ export async function createStudyBench(data: {
   editalItems?: { category: string; topic: string; description?: string; weight?: number }[];
   examBoard?: string;
   examNotice?: string;
+  publicEditalId?: string | null;
 }) {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -131,6 +145,7 @@ export async function createStudyBench(data: {
           weeklyHours: data.weeklyHours,
           examBoard: data.examBoard,
           examNotice: data.examNotice,
+          publicEditalId: data.publicEditalId,
         })
         .returning();
 
@@ -162,6 +177,11 @@ export async function createStudyBench(data: {
 
       return { bench, subjects: createdSubjects };
     });
+
+    // 5. Se tiver publicEditalId e nenhuma matéria foi passada, clonar automaticamente
+    if (data.publicEditalId && data.subjects.length === 0) {
+      await selectPublicEdital(result.bench.id, data.publicEditalId);
+    }
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/bancadas");

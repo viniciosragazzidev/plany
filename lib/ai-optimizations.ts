@@ -1,48 +1,11 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const apiKey = process.env.GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(apiKey || "");
+import { generateAIContent, generateEmbedding } from "./ai-service";
 
 /**
- * Gera embeddings para um texto usando o modelo de embedding do Gemini.
- * Inclui lógica de retry e fallback silencioso se todos os modelos falharem.
+ * Gera embeddings para um texto.
+ * Agora centralizado via ai-service para suportar modelos locais (Ollama) e fallbacks.
  */
 export async function getEmbedding(text: string, maxRetries = 1): Promise<number[] | null> {
-  const models = [
-    "models/gemini-embedding-001",
-    "models/text-embedding-004", 
-    "text-embedding-004",
-    "embedding-001"
-  ];
-  
-  for (const modelName of models) {
-    const model = genAI.getGenerativeModel({ model: modelName });
-    
-    for (let i = 0; i <= maxRetries; i++) {
-      try {
-        const result = await model.embedContent({
-          content: { role: 'user', parts: [{ text: text.substring(0, 30000) }] },
-          // @ts-ignore
-          outputDimensionality: 768
-        });
-        const values = result.embedding.values;
-        
-        if (values) return values;
-      } catch (error: any) {
-        // Erro de Quota (429): Espera curta e tenta de novo se houver retentativas
-        if (error.status === 429 && i < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          continue;
-        }
-
-        // Se o modelo não existir ou houver outro erro, tenta o próximo modelo da lista
-        break;
-      }
-    }
-  }
-  
-  console.warn("[Embedding] Não foi possível gerar vetores. Buscas semânticas desativadas temporariamente.");
-  return null;
+  return generateEmbedding(text);
 }
 
 
@@ -87,18 +50,20 @@ export function chunkMarkdown(content: string, maxChunkSize = 1000): string[] {
 
   return chunks;
 }
-
 /**
  * Classifica a natureza de um trecho de anotação usando Gemini 2.5 Flash.
  * Objetivo: Enriquecer metadados para RAG cirúrgico.
  */
 export async function classifyChunk(text: string): Promise<string> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `Analise o trecho de anotação de aula fornecido e retorne estritamente uma única palavra da lista: [Dica, Exemplo, Lei, Macete]. Não explique sua escolha.\n\nTRECHO: "${text.substring(0, 2000)}"`;
     
-    const result = await model.generateContent(prompt);
-    const category = result.response.text().trim().replace(/[^\w]/g, "");
+    const response = await generateAIContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    });
+
+    const category = response.text.trim().replace(/[^\w]/g, "");
     
     const validCategories = ["Dica", "Exemplo", "Lei", "Macete"];
     return validCategories.includes(category) ? category : "Outro";

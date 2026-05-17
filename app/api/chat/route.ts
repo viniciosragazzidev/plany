@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
@@ -6,11 +5,9 @@ import { db } from "@/lib/db";
 import { studyBenches, materials, materialChunks, semanticCache } from "@/lib/db/schema";
 import { eq, and, inArray, sql, desc } from "drizzle-orm";
 import { getEmbedding } from "@/lib/ai-optimizations";
+import { generateAIContent } from "@/lib/ai-service";
 
 export const maxDuration = 30;
-
-const apiKey = process.env.GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(apiKey || "");
 
 interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -27,16 +24,16 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { 
-      messages, 
-      benchId, 
-      selectedSubjectIds, 
-      isEditalConsultantMode 
-    }: { 
-      messages: ChatMessage[], 
-      benchId: string, 
-      selectedSubjectIds?: string[], 
-      isEditalConsultantMode?: boolean 
+    const {
+      messages,
+      benchId,
+      selectedSubjectIds,
+      isEditalConsultantMode
+    }: {
+      messages: ChatMessage[],
+      benchId: string,
+      selectedSubjectIds?: string[],
+      isEditalConsultantMode?: boolean
     } = await req.json();
 
     const lastUserMessage = messages.filter((m) => m.role === "user").pop()?.content || "";
@@ -46,7 +43,7 @@ export async function POST(req: NextRequest) {
     if (!isEditalConsultantMode && lastUserMessage) {
       try {
         queryEmbedding = await getEmbedding(lastUserMessage);
-        
+
         if (queryEmbedding) {
           const [cachedResponse] = await db
             .select({
@@ -101,13 +98,13 @@ Fonte: ${editalContent}`;
             .where(
               and(
                 eq(materials.benchId, benchId),
-                selectedSubjectIds && selectedSubjectIds.length > 0 
+                selectedSubjectIds && selectedSubjectIds.length > 0
                   ? inArray(materials.subjectId, selectedSubjectIds)
                   : undefined
               )
             )
             .orderBy(t => desc(t.similarity))
-            .limit(8); // Aumentamos um pouco para ter mais contexto de tags
+            .limit(8);
 
           contextMaterials = relevantChunks
             .map(c => `--- MATERIAL: ${c.materialTitle} ${c.originTag ? `(Natureza: ${c.originTag})` : ""} ---\n${c.content}`)
@@ -134,12 +131,12 @@ ${contextMaterials || "Nenhum trecho específico foi encontrado nos materiais pa
 
 ${!contextMaterials ? `### 📚 MATERIAIS DISPONÍVEIS NA BANCADA:
 ${(await db.query.materials.findMany({
-  where: and(
-    eq(materials.benchId, benchId),
-    selectedSubjectIds && selectedSubjectIds.length > 0 ? inArray(materials.subjectId, selectedSubjectIds) : undefined
-  ),
-  columns: { title: true }
-})).map(m => `- ${m.title}`).join("\n") || "Nenhum material foi carregado ainda."}
+        where: and(
+          eq(materials.benchId, benchId),
+          selectedSubjectIds && selectedSubjectIds.length > 0 ? inArray(materials.subjectId, selectedSubjectIds) : undefined
+        ),
+        columns: { title: true }
+      })).map(m => `- ${m.title}`).join("\n") || "Nenhum material foi carregado ainda."}
 ` : ""}
 
 ---
@@ -155,42 +152,28 @@ ${(await db.query.materials.findMany({
 Idioma: Português do Brasil.`;
     }
 
-    // 3. Geração com Fallback Multi-Modelo
-    const rawHistory = messages.slice(0, -1).map((m) => ({
-      role: (m.role === "assistant" ? "model" : "user") as "model" | "user",
-      parts: [{ text: m.content }],
-    }));
-
-    // Encontra o índice da primeira mensagem de usuário
-    const firstUserIndex = rawHistory.findIndex((m) => m.role === "user");
-    const history = firstUserIndex !== -1 ? rawHistory.slice(firstUserIndex) : [];
-
-    const models = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
+    // 3. Geração de Resposta (Usando Centralized AI Service com Local Fallback)
     let resultText = "";
-    let lastError: Error | undefined;
 
-    for (const modelName of models) {
-      try {
-        const model = genAI.getGenerativeModel({ 
-          model: modelName,
-          systemInstruction: systemPrompt 
-        });
-        
-        const chat = model.startChat({ history });
-        const result = await chat.sendMessage(lastUserMessage);
-        resultText = result.response.text();
-        
-        if (resultText) break;
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[Chat] Modelo ${modelName} falhou:`, err.message);
-        if (err.status === 429 || err.status === 404) continue;
-        break; 
-      }
-    }
-
-    if (!resultText) {
-      throw lastError || new Error("IA temporariamente indisponível.");
+    try {
+      const aiResponse = await generateAIContent({
+        model: "gemini-2.0-flash",
+        contents: messages.map((m) => ({
+          role: m.role === "assistant" ? "model" : m.role,
+          parts: [{ text: m.content }],
+        })) as any,
+        config: {
+          systemInstruction: {
+            parts: [{ text: systemPrompt }]
+          },
+          temperature: 0.3
+        }
+      });
+      
+      resultText = aiResponse.text;
+    } catch (error: any) {
+      console.error("[Chat] Erro na geração de IA:", error);
+      throw error;
     }
 
     // 4. Cache Semântico (Async)

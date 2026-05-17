@@ -83,12 +83,6 @@ export function SummariesTool({ benchId, subjects, materials }: SummariesToolPro
     }
   }, [isGeneratingSummary]);
 
-  useEffect(() => {
-    if (sidebarState === 'summary_list' || sidebarState === 'active_summary') {
-      loadSummaries();
-    }
-  }, [sidebarState]);
-
   const loadSummaries = async () => {
     setIsLoading(true);
     try {
@@ -103,6 +97,12 @@ export function SummariesTool({ benchId, subjects, materials }: SummariesToolPro
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (sidebarState === 'summary_list' || sidebarState === 'active_summary') {
+      loadSummaries();
+    }
+  }, [sidebarState]);
 
   const handleGenerate = async () => {
     if (selectedMaterials.length === 0) {
@@ -387,7 +387,7 @@ export function SummariesTool({ benchId, subjects, materials }: SummariesToolPro
                                 Analogia Prática
                               </div>
                               <p className="text-xs text-amber-900 leading-relaxed font-bold italic">
-                                "{step.analogy}"
+                                &quot;{step.analogy}&quot;
                               </p>
                             </div>
                           </div>
@@ -443,7 +443,7 @@ export function SummariesTool({ benchId, subjects, materials }: SummariesToolPro
                    <div className="space-y-3">
                      <h5 className="text-3xl font-black text-foreground tracking-tight leading-none">Mapa Completo!</h5>
                      <p className="text-base text-muted-foreground italic max-w-2xl mx-auto px-8 leading-relaxed font-medium">
-                       "{activeSummaryData?.conclusion}"
+                       &quot;{activeSummaryData?.conclusion}&quot;
                      </p>
                    </div>
                    <Button 

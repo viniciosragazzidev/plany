@@ -1,7 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
-
-const apiKey = process.env.GEMINI_API_KEY;
-const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+import { generateAIContent } from "@/lib/ai-service";
 
 export interface QueryGenInput {
   materia: string;
@@ -14,48 +11,71 @@ export interface QueryGenOutput {
   queries: string[];
 }
 
-export async function researchEmptyEditalTopics(editalContent: string, webContext?: string): Promise<string[]> {
-  const systemPrompt = `Você é um Assistente Especialista em Concursos Públicos e Pesquisa Acadêmica.
-O usuário importou um edital (ou parte dele) que NÃO possui o conteúdo programático definido.
+export interface DiscoveredEditalData {
+  metadata: {
+    institution: string;
+    role: string;
+    year: string;
+  };
+  subjects: string[];
+  items: { category: string; topic: string; weight: number }[];
+}
 
-Sua tarefa ocorre em DUAS FASES:
-Fase 1: Reunir Nome do Concurso, Ano, Data da Prova e Matérias baseando-se no texto fornecido ${webContext ? "E nas informações pesquisadas na web" : ""}.
-Fase 2: Atuar como um "Garimpo" (Pesquisador). Para o concurso identificado e as matérias encontradas, VOCÊ DEVE ESTIPULAR/PESQUISAR na sua base de conhecimento qual é o CONTEÚDO PROGRAMÁTICO PADRÃO E ESPERADO. 
+export async function researchEmptyEditalTopics(editalContent: string, webContext?: string): Promise<DiscoveredEditalData> {
+  const systemPrompt = `Você é um Analista Forense de Editais e Pesquisador Acadêmico de Elite.
+O usuário forneceu um fragmento de edital que pode estar incompleto, ou apenas o nome de um concurso. 
+Sua missão é reconstruir ou descobrir o CONTEÚDO PROGRAMÁTICO INTEGRAL e os metadados do concurso.
 
-${webContext ? `CONTEXTO PESQUISADO NA WEB (Use isso como fonte prioritária):\n${webContext}\n` : ""}
+REGRAS RIGOROSAS:
+1. METADADOS: Identifique a Instituição (ex: "Polícia Federal"), o Cargo/Role (ex: "Agente de Polícia") e o Ano (ex: "2026").
+2. EXAUSTIVIDADE DE MATÉRIAS: Você deve identificar TODAS as disciplinas que o concurso cobra. Não omita nenhuma matéria padrão do cargo.
+3. EXAUSTIVIDADE DE TÓPICOS: Para CADA disciplina, gere UMA LISTA EXAUSTIVA de tópicos. Nunca coloque apenas "Geral" ou 2 tópicos se a disciplina for vasta. Detalhe de 10 a 20 tópicos por disciplina se aplicável.
+4. PRECISÃO SEMÂNTICA: A 'category' DEVE ser o nome da disciplina (Ex: "Língua Portuguesa"). O 'topic' DEVE ser o assunto específico (Ex: "Crase", "Interpretação de Texto"). Nunca repita o nome da disciplina no tópico.
+5. PESQUISA WEB: Se o 'webContext' trouxer o conteúdo real, baseie-se nele estritamente.
 
-Retorne APENAS um JSON válido contendo uma lista consolidada de tópicos no formato "Matéria: Nome do Tópico".
-Exemplo de formato:
+${webContext ? `CONTEXTO PESQUISADO NA WEB (FONTE PRIORITÁRIA):\n${webContext}\n` : ""}
+
+Sua resposta deve ser estritamente um JSON válido:
 {
-  "topics": [
-    "Língua Portuguesa: Compreensão e interpretação de textos",
-    "Direito Administrativo: Atos Administrativos",
-    "Informática: Segurança da Informação"
+  "metadata": {
+    "institution": "Polícia Federal",
+    "role": "Agente de Polícia",
+    "year": "2026"
+  },
+  "subjects": ["Língua Portuguesa", "Matemática", "Conhecimentos Aquaviários"],
+  "items": [
+    { "category": "Língua Portuguesa", "topic": "Interpretação de Texto", "weight": 1 },
+    { "category": "Língua Portuguesa", "topic": "Crase", "weight": 1 },
+    { "category": "Matemática", "topic": "Equações de 2º Grau", "weight": 1 }
   ]
 }`;
 
-  const userPrompt = `Texto do Edital Importado:\n\n${editalContent.substring(0, 5000)}\n\nExtraia os dados (Concurso, Ano, Data, Materias) e, em seguida, liste os conteúdos programáticos para essas matérias. Retorne apenas o JSON com o array 'topics'.`;
+  const userPrompt = `Contexto/Edital Fornecido:\n\n${editalContent.substring(0, 8000)}\n\nIdentifique o cargo/concurso e gere a lista COMPLETA de matérias e tópicos baseando-se no padrão ouro para este certame. Retorne apenas o JSON estruturado.`;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateAIContent({
       model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      forceCloud: true,
       config: {
-        systemInstruction: {
-          parts: [{ text: systemPrompt }],
-        },
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        responseMimeType: "application/json"
       },
     });
 
     const text = response.text;
-    if (!text) return [];
+    if (!text) return { metadata: { institution: "", role: "", year: "" }, subjects: [], items: [] };
 
     const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
     const parsed = JSON.parse(jsonStr);
-    return parsed.topics || [];
+    return {
+      metadata: parsed.metadata || { institution: "", role: "", year: "" },
+      subjects: parsed.subjects || [],
+      items: parsed.items || []
+    };
   } catch (error) {
     console.error("Erro ao pesquisar tópicos do edital vazio:", error);
-    return [];
+    return { metadata: { institution: "", role: "", year: "" }, subjects: [], items: [] };
   }
 }
 
@@ -64,7 +84,7 @@ Exemplo de formato:
  */
 export async function beautifyMaterialTitle(rawTitle: string, topic: string): Promise<string> {
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateAIContent({
       model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: `Você é um Curador de Conteúdo Acadêmico. 
 Sua tarefa é limpar e transformar um título de arquivo/página web em um título elegante, profissional e direto para um material de estudo.
@@ -127,8 +147,8 @@ ${input.editalContent ? `Referência do Edital (use apenas para contexto de prof
 Gere queries Google Dorks para encontrar materiais de estudo em Português (Brasil).`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash", // Using the available model, user mentioned 1.5 Pro but I see 2.5-flash in bench.ts
+    const response = await generateAIContent({
+      model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
       config: {
         systemInstruction: {

@@ -6,6 +6,7 @@ import {
   createSubject, 
   deleteSubject as deleteSubjectAction, 
   createTopic, 
+  deleteTopic as deleteTopicAction,
   toggleTopicCompletion as toggleTopicAction, 
   addMaterial as addMaterialAction, 
   deleteMaterial as deleteMaterialAction,
@@ -182,6 +183,25 @@ export function useBenchData(benchId: string) {
     }
   })
 
+  const deleteTopicMutation = useMutation({
+    mutationFn: (topicId: string) => deleteTopicAction(topicId),
+    onMutate: async (topicId) => {
+      await queryClient.cancelQueries({ queryKey: ['bench-edital-items', benchId] })
+      const previousItems = queryClient.getQueryData(['bench-edital-items', benchId])
+      queryClient.setQueryData(['bench-edital-items', benchId], (old: any) => 
+        old?.filter((item: any) => item.id !== topicId)
+      )
+      return { previousItems }
+    },
+    onError: (err, topicId, context) => {
+      queryClient.setQueryData(['bench-edital-items', benchId], context?.previousItems)
+      toast.error('Ops! Não consegui excluir o assunto. Tenta de novo?')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['bench-edital-items', benchId] })
+    }
+  })
+
   return {
     subjects: subjectsQuery.data || [],
     editalItems: editalItemsQuery.data || [],
@@ -191,6 +211,7 @@ export function useBenchData(benchId: string) {
     deleteSubject: deleteSubjectMutation.mutate,
     toggleTopic: toggleTopicMutation.mutate,
     addTopic: addTopicMutation.mutate,
+    deleteTopic: deleteTopicMutation.mutate,
     addMaterial: addMaterialMutation.mutateAsync,
     deleteMaterial: deleteMaterialMutation.mutate,
     togglePin: togglePinMutation.mutate,

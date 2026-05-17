@@ -33,16 +33,15 @@ export function DeleteBenchButton({ benchId }: { benchId: string }) {
       const result = await deleteStudyBench(benchId);
       if (result.success) {
         toast.success("Bancada excluída com sucesso.");
-        router.refresh();
+        // Keep isPending true and dialog open so UI doesn't flash the deleted bench
         router.push("/dashboard/bancadas");
       } else {
         toast.error(result.error || "Erro ao excluir bancada.");
+        setIsPending(false);
       }
     } catch (error) {
       toast.error("Erro inesperado ao excluir bancada.");
-    } finally {
       setIsPending(false);
-      setIsDialogOpen(false);
     }
   };
 

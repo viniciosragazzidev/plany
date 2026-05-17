@@ -63,9 +63,12 @@ export function SourceColumn({ benchId }: SourceColumnProps) {
     isLoading, 
     toggleTopic, 
     deleteSubject,
+    deleteTopic,
     deleteMaterial,
     togglePin
   } = useBenchData(benchId);
+
+  const [topicToDelete, setTopicToDelete] = useState<string | null>(null);
 
   React.useEffect(() => {
     setMounted(true);
@@ -88,6 +91,13 @@ export function SourceColumn({ benchId }: SourceColumnProps) {
     deleteSubject(subjectToDelete);
     toast.success("Disciplina excluída com sucesso!");
     setSubjectToDelete(null);
+  };
+
+  const handleDeleteTopic = async () => {
+    if (!topicToDelete) return;
+    deleteTopic(topicToDelete);
+    toast.success("Assunto excluído com sucesso!");
+    setTopicToDelete(null);
   };
 
   const uncategorizedMaterials = getMaterialsBySubject(null);
@@ -315,6 +325,18 @@ export function SourceColumn({ benchId }: SourceColumnProps) {
                                                           )}
                                                       </div>
                                                   </AccordionTrigger>
+                                                  
+                                                  <Button 
+                                                    variant="ghost" 
+                                                    size="icon-xs" 
+                                                    className="opacity-0 group-hover/topic:opacity-100 h-6 w-6 rounded-md transition-opacity shrink-0 mr-1"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setTopicToDelete(item.id);
+                                                    }}
+                                                  >
+                                                      <HugeiconsIcon icon={Delete02Icon} size={12} className="text-destructive/60" />
+                                                  </Button>
                                                 </div>
                                                 <AccordionContent className="pt-1 pb-2 pl-4 space-y-0.5 border-none">
                                                     {topicMaterials.map(m => (
@@ -359,6 +381,15 @@ export function SourceColumn({ benchId }: SourceColumnProps) {
         title="Excluir Disciplina?"
         description="Tem certeza que deseja excluir esta disciplina e todos os seus materiais? Esta ação não pode ser desfeita."
         onConfirm={handleDeleteSubject}
+        variant="destructive"
+      />
+
+      <ConfirmDialog
+        open={!!topicToDelete}
+        onOpenChange={(open) => !open && setTopicToDelete(null)}
+        title="Excluir Assunto?"
+        description="Tem certeza que deseja excluir este assunto e todos os seus materiais? Esta ação não pode ser desfeita."
+        onConfirm={handleDeleteTopic}
         variant="destructive"
       />
     </div>

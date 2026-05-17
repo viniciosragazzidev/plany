@@ -6,7 +6,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { createAnotacao } from "@/lib/actions/cadernos";
 import { toast } from "sonner";
@@ -22,7 +22,7 @@ export function SidebarCadernos() {
     setOpenSubjects(prev => ({ ...prev, [subjectId]: !prev[subjectId] }));
   };
 
-  const handleNewNote = async (benchId: string, subjectId: string) => {
+  const handleNewNote = useCallback(async (benchId: string, subjectId: string) => {
     // Optimistic UI - Create immediately in state
     const tempId = `temp_${Date.now()}`;
     const newNote = {
@@ -62,7 +62,7 @@ export function SidebarCadernos() {
         toast.error("Ops, deu um soluço na rede! Tentei criar a anotação, mas não foi. Tenta de novo?");
         router.push("/dashboard/cadernos");
     }
-  };
+  }, [router, setActiveAnotacao, addAnotacao]);
 
   const filteredAnotacoes = anotacoes.filter(a => 
     a.title.toLowerCase().includes(searchQuery.toLowerCase()) || 

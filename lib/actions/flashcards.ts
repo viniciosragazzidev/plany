@@ -10,11 +10,8 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, desc, sql, lte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { GoogleGenAI } from "@google/genai";
+import { generateAIContent } from "@/lib/ai-service";
 import { getEmbedding } from "@/lib/ai-optimizations";
-
-const apiKey = process.env.GEMINI_API_KEY;
-const ai = new GoogleGenAI({ apiKey: apiKey || "" });
 
 /**
  * Gera Flashcards usando RAG (Busca Cirúrgica)
@@ -73,7 +70,7 @@ export async function generateFlashcardsAction(
     REGRAS:
     - O 'front' deve ser uma pergunta curta, um termo para definir ou um conceito lacunado (cloze).
     - O 'back' deve ser a resposta direta, explicação concisa ou o termo faltante.
-    - Foque em pontos chave, datas, fórmulas ou conceitos que costumam cair em provas.
+    - Foque em pontos chave, das, fórmulas ou conceitos que costumam cair em provas.
     - Retorne APENAS um JSON válido.
 
     FORMATO JSON:
@@ -84,7 +81,7 @@ export async function generateFlashcardsAction(
       ]
     }`;
 
-    const response = await ai.models.generateContent({
+    const response = await generateAIContent({
       model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: `CONTEÚDO DE BASE:\n${contextText}` }] }],
       config: {

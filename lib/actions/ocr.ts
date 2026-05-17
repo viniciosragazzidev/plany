@@ -1,12 +1,9 @@
 'use server'
 
-import { GoogleGenAI } from "@google/genai";
+import { generateAIContent } from "@/lib/ai-service";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { actionSuccess, actionError, ActionResponse } from "./types";
-
-const apiKey = process.env.GEMINI_API_KEY;
-const ai = new GoogleGenAI({ apiKey: apiKey || "" });
 
 /**
  * Server Action for AI Image Scanner (OCR)
@@ -40,59 +37,38 @@ REGRAS DE FORMATAÇÃO (ESTRITAS):
 
 Retorne estritamente o Markdown.`;
 
-    const models = ["gemini-2.5-flash", "gemini-1.5-flash"];
-    let lastError: any;
-
-    for (const modelName of models) {
-      // Tenta 2 vezes por modelo com espera entre elas se for 429
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          const response = await ai.models.generateContent({
-            model: modelName,
-            contents: [
+    try {
+      const response = await generateAIContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
               {
-                role: "user",
-                parts: [
-                  { text: prompt },
-                  {
-                    inlineData: {
-                      mimeType: file.type,
-                      data: base64
-                    }
-                  }
-                ]
+                inlineData: {
+                  mimeType: file.type,
+                  data: base64
+                }
               }
-            ],
-            config: {
-              responseMimeType: "text/plain"
-            }
-          });
-
-          const text = response.text;
-          if (text && text.trim().length > 0) {
-            return actionSuccess(text, "Texto extraído com sucesso!");
+            ]
           }
-        } catch (error: any) {
-          lastError = error;
-          
-          // Se for erro de quota (429), espera e tenta de novo ou muda de modelo
-          if (error.status === 429) {
-            if (attempt === 0) {
-              const delay = 2000; // Espera 2s antes da retentativa no mesmo modelo
-              await new Promise(resolve => setTimeout(resolve, delay));
-              continue;
-            }
-            // No segundo erro 429, sai do loop interno para tentar o próximo modelo
-            break;
-          }
-          // Outros erros (404, etc), tenta o próximo modelo imediatamente
-          break;
+        ],
+        config: {
+          responseMimeType: "text/plain"
         }
+      });
+
+      const text = response.text;
+      if (text && text.trim().length > 0) {
+        return actionSuccess(text, "Texto extraído com sucesso!");
       }
+    } catch (error: any) {
+      console.error("Erro no OCR:", error);
+      return actionError("A IA está um pouco sobrecarregada agora. Pode tentar de novo em alguns segundos?");
     }
 
-    console.error("Erro final no OCR após retentativas:", lastError);
-    return actionError("A IA está um pouco sobrecarregada agora. Pode tentar de novo em alguns segundos?");
+    return actionError("Putz, deu um erro inesperado. Consegue subir a foto de novo?");
   } catch (error) {
     console.error("Erro fatal no OCR:", error);
     return actionError("Putz, deu um erro inesperado. Consegue subir a foto de novo?");

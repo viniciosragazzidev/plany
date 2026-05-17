@@ -92,8 +92,8 @@ export function BenchProvider({
     localStorage.setItem(`plany_selected_subjects_${benchId}`, JSON.stringify(selectedContextSubjects));
   }, [selectedContextSubjects, benchId]);
 
-  const startBackgroundResearch = async () => {
-    if (selectedContextSubjects.length === 0) {
+  const startBackgroundResearch = async (specificTopics?: string[]) => {
+    if (!specificTopics && selectedContextSubjects.length === 0) {
       toast.error("Selecione disciplinas no contexto para garimpar.");
       return;
     }
@@ -109,7 +109,7 @@ export function BenchProvider({
 
     try {
       setResearchStatus("IA analisando tópicos selecionados...");
-      const response = await performWebResearch(benchId, selectedContextSubjects, 5);
+      const response = await performWebResearch(benchId, selectedContextSubjects, 5, specificTopics);
 
       if (response.success) {
         setResearchResults(response.results || []);

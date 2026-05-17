@@ -8,16 +8,13 @@ import {
   quizAttempts, 
   materials, 
   subjects, 
-  editalItems 
+  editalItems,
+  materialChunks
 } from "@/lib/db/schema";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { GoogleGenAI } from "@google/genai";
+import { generateAIContent } from "@/lib/ai-service";
 import { getEmbedding } from "@/lib/ai-optimizations";
-import { materialChunks } from "@/lib/db/schema";
-
-const apiKey = process.env.GEMINI_API_KEY;
-const ai = new GoogleGenAI({ apiKey: apiKey || "" });
 
 export async function generateQuizAction(
   benchId: string, 
@@ -92,7 +89,7 @@ export async function generateQuizAction(
       ]
     }`;
 
-    const response = await ai.models.generateContent({
+    const response = await generateAIContent({
       model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: `CONTEÚDO DE BASE:\n${contextText}` }] }],
       config: {

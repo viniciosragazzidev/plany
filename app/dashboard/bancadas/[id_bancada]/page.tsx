@@ -39,12 +39,16 @@ export default async function BenchDetailPage({
     redirect("/dashboard");
   }
 
-  const bench = await db.query.studyBenches.findFirst({
-    where: and(
-      eq(studyBenches.id, id_bancada),
-      eq(studyBenches.profileId, profile.id)
-    ),
-  });
+  const [bench] = await db
+    .select()
+    .from(studyBenches)
+    .where(
+      and(
+        eq(studyBenches.id, id_bancada),
+        eq(studyBenches.profileId, profile.id)
+      )
+    )
+    .limit(1);
 
   if (!bench) {
     notFound();

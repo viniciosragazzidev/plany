@@ -1,7 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
-
-const apiKey = process.env.GEMINI_API_KEY;
-const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+import { generateAIContent } from "@/lib/ai-service";
 
 export interface ConversionResult {
   markdown: string;
@@ -43,7 +40,7 @@ Objetivo final: Um documento Markdown limpo e educacional.`;
 ${htmlContent.substring(0, 15000)}`;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateAIContent({
       model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
       config: {
@@ -110,7 +107,7 @@ Instruções:
 ${pdfText.substring(0, 20000)}`;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateAIContent({
       model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
       config: {

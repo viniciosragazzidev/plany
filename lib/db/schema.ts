@@ -88,8 +88,10 @@ export const studyBenches = pgTable("study_benches", {
   examNoticeRaw: text("exam_notice_raw"), // Raw PDF text
   examNoticeUrl: text("exam_notice_url"), // URL for the PDF
   examBoard: text("exam_board"), // Banca examinadora
+  hasDiscoveredTopics: boolean("has_discovered_topics").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   researchStatus: text("research_status").default("idle").notNull(), // idle, researching, completed, failed
+  publicEditalId: uuid("public_edital_id"), // Refers to publicEditais if cloned
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -135,6 +137,35 @@ export const materials = pgTable("materials", {
   isPinned: boolean("is_pinned").default(false).notNull(),
   contentVectorRef: text("content_vector_ref"), // Placeholder for future vector DB integration
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// --- Public Caching System ---
+
+export const publicEditais = pgTable("public_editais", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slugName: text("slug_name").unique().notNull(),
+  fileHash: text("file_hash").unique().notNull(),
+  institution: text("institution").notNull(),
+  role: text("role").notNull(),
+  year: text("year").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const publicSubjects = pgTable("public_subjects", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  publicEditalId: uuid("public_edital_id")
+    .notNull()
+    .references(() => publicEditais.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+});
+
+export const publicTopics = pgTable("public_topics", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  publicSubjectId: uuid("public_subject_id")
+    .notNull()
+    .references(() => publicSubjects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
 });
 
 export const webSources = pgTable("web_sources", {
@@ -311,6 +342,10 @@ export const studyBenchesRelations = relations(studyBenches, ({ many, one }) => 
   subjects: many(subjects),
   materials: many(materials),
   editalItems: many(editalItems),
+  publicEdital: one(publicEditais, {
+    fields: [studyBenches.publicEditalId],
+    references: [publicEditais.id],
+  }),
 }));
 
 export const subjectsRelations = relations(subjects, ({ one, many }) => ({
@@ -331,4 +366,24 @@ export const materialsRelations = relations(materials, ({ one, many }) => ({
     references: [subjects.id],
   }),
   chunks: many(materialChunks),
+}));
+
+export const publicEditaisRelations = relations(publicEditais, ({ many }) => ({
+  subjects: many(publicSubjects),
+  studyBenches: many(studyBenches),
+}));
+
+export const publicSubjectsRelations = relations(publicSubjects, ({ one, many }) => ({
+  publicEdital: one(publicEditais, {
+    fields: [publicSubjects.publicEditalId],
+    references: [publicEditais.id],
+  }),
+  topics: many(publicTopics),
+}));
+
+export const publicTopicsRelations = relations(publicTopics, ({ one }) => ({
+  publicSubject: one(publicSubjects, {
+    fields: [publicTopics.publicSubjectId],
+    references: [publicSubjects.id],
+  }),
 }));
