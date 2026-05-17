@@ -382,39 +382,39 @@ export function WebResearchDialog({
                       </AccordionTrigger>
                       <AccordionContent className="p-0 space-y-4">
                         <Accordion multiple={true} defaultValue={Object.keys(discoveredTopics)} className="w-full space-y-4">
-                        {Object.entries(discoveredTopics).map(([category, topics]) => (
-                          <AccordionItem key={category} value={category} className="border-none">
-                            <AccordionTrigger className="hover:no-underline py-0 border-none group">
-                              <div className="flex items-center gap-2 flex-1 text-left min-w-0">
-                                <div className="w-1.5 h-1.5 rounded-full bg-primary/40 group-data-[state=open]:bg-primary transition-colors shrink-0" />
-                                <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] truncate flex-1" title={category}>{category}</h4>
-                              </div>
-                            </AccordionTrigger>
-                            <AccordionContent className="pt-2 pb-0 border-none">
-                              <Card className="overflow-hidden border-border/50 rounded-2xl bg-secondary/5">
-                                <div className="p-2 space-y-1">
-                                  {topics.map(topic => (
-                                    <div key={topic} className="flex items-center gap-3 p-2 hover:bg-background/50 rounded-xl transition-colors group">
-                                      <Checkbox
-                                        id={topic}
-                                        checked={selectedTopics[category]?.includes(topic)}
-                                        onCheckedChange={() => toggleTopicSelection(category, topic)}
-                                        className="border-primary/30 data-[state=checked]:bg-primary"
-                                      />
-                                      <Label
-                                        htmlFor={topic}
-                                        className="text-xs font-bold leading-tight flex-1 cursor-pointer group-hover:text-primary transition-colors truncate max-w-[150px] inline-block"
-                                        title={topic}
-                                      >
-                                        {topic}
-                                      </Label>
-                                    </div>
-                                  ))}
+                          {Object.entries(discoveredTopics).map(([category, topics]) => (
+                            <AccordionItem key={category} value={category} className="border-none">
+                              <AccordionTrigger className="hover:no-underline py-0 border-none group">
+                                <div className="flex items-center gap-2 flex-1 text-left min-w-0">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-primary/40 group-data-[state=open]:bg-primary transition-colors shrink-0" />
+                                  <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] truncate flex-1" title={category}>{category}</h4>
                                 </div>
-                              </Card>
-                            </AccordionContent>
-                          </AccordionItem>
-                        ))}
+                              </AccordionTrigger>
+                              <AccordionContent className="pt-2 pb-0 border-none">
+                                <Card className="overflow-hidden border-border/50 rounded-2xl bg-secondary/5">
+                                  <div className="p-2 space-y-1">
+                                    {topics.map(topic => (
+                                      <div key={topic} className="flex items-center gap-3 p-2 hover:bg-background/50 rounded-xl transition-colors group">
+                                        <Checkbox
+                                          id={topic}
+                                          checked={selectedTopics[category]?.includes(topic)}
+                                          onCheckedChange={() => toggleTopicSelection(category, topic)}
+                                          className="border-primary/30 data-[state=checked]:bg-primary"
+                                        />
+                                        <Label
+                                          htmlFor={topic}
+                                          className="text-xs font-bold leading-tight flex-1 cursor-pointer group-hover:text-primary transition-colors truncate max-w-[350px] inline-block"
+                                          title={topic}
+                                        >
+                                          {topic}
+                                        </Label>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </Card>
+                              </AccordionContent>
+                            </AccordionItem>
+                          ))}
                         </Accordion>
                       </AccordionContent>
                     </AccordionItem>
