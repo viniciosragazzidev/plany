@@ -127,18 +127,26 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
     }
   }
 
-  // gemini-embedding-2 is the current state-of-the-art embedding model in 2026
+  // gemini-embedding-2 and text-embedding-004 support Matryoshka embeddings
+  // We force 768 dimensions to match our database schema (pgvector dimensions: 768)
   const models = ["gemini-embedding-2", "gemini-embedding-001"];
   
   for (const modelName of models) {
     try {
       const response = await ai.models.embedContent({
         model: modelName,
-        contents: text.substring(0, 30000)
+        contents: text.substring(0, 30000),
+        // @ts-ignore - outputDimensionality is supported by newer models even if not in all SDK types
+        outputDimensionality: 768
       });
       
       if (response.embeddings?.[0]?.values) {
-        return response.embeddings[0].values;
+        let values = response.embeddings[0].values;
+        // Safety truncation if API ignored outputDimensionality
+        if (values.length > 768) {
+          values = values.slice(0, 768);
+        }
+        return values;
       }
     } catch (error: any) {
       console.warn(`[AI-Service] Embedding com ${modelName} falhou:`, error.message);

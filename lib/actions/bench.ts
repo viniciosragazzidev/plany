@@ -358,26 +358,31 @@ export async function addMaterial(formData: FormData): Promise<ActionResponse<{ 
       const { chunkMarkdown, getEmbedding, classifyChunk } = await import("@/lib/ai-optimizations");
       const chunks = chunkMarkdown(content);
 
-      for (const chunk of chunks) {
-        try {
-          const [embedding, originTag] = await Promise.all([
-            getEmbedding(chunk),
-            classifyChunk(chunk)
-          ]);
+      // Process chunks in parallel batches to speed up ingestion
+      const batchSize = 5;
+      for (let i = 0; i < chunks.length; i += batchSize) {
+        const batch = chunks.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (chunk) => {
+          try {
+            const [embedding, originTag] = await Promise.all([
+              getEmbedding(chunk),
+              classifyChunk(chunk)
+            ]);
 
-          if (embedding) {
-            await db.insert(materialChunks).values({
-              materialId: material.id,
-              content: chunk,
-              embedding,
-              subjectId: material.subjectId,
-              topicId: material.editalItemId,
-              originTag
-            });
+            if (embedding) {
+              await db.insert(materialChunks).values({
+                materialId: material.id,
+                content: chunk,
+                embedding,
+                subjectId: material.subjectId,
+                topicId: material.editalItemId,
+                originTag
+              });
+            }
+          } catch (err) {
+            console.error(`Erro ao vetorizar chunk do material ${material.id}:`, err);
           }
-        } catch (err) {
-          console.error(`Erro ao vetorizar chunk do material ${material.id}:`, err);
-        }
+        }));
       }
     }
 
@@ -897,26 +902,32 @@ export async function importWebMaterials(webSourceIds: string[]) {
         if (source.markdownContent) {
           const { chunkMarkdown, getEmbedding, classifyChunk } = await import("@/lib/ai-optimizations");
           const chunks = chunkMarkdown(source.markdownContent);
-          for (const chunk of chunks) {
-            try {
-              const [embedding, originTag] = await Promise.all([
-                getEmbedding(chunk),
-                classifyChunk(chunk)
-              ]);
+          
+          // Process chunks in parallel batches to speed up ingestion
+          const batchSize = 5;
+          for (let i = 0; i < chunks.length; i += batchSize) {
+            const batch = chunks.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (chunk) => {
+              try {
+                const [embedding, originTag] = await Promise.all([
+                  getEmbedding(chunk),
+                  classifyChunk(chunk)
+                ]);
 
-              if (embedding) {
-                await db.insert(materialChunks).values({
-                  materialId: material.id,
-                  content: chunk,
-                  embedding,
-                  subjectId: material.subjectId,
-                  topicId: material.editalItemId,
-                  originTag
-                });
+                if (embedding) {
+                  await db.insert(materialChunks).values({
+                    materialId: material.id,
+                    content: chunk,
+                    embedding,
+                    subjectId: material.subjectId,
+                    topicId: material.editalItemId,
+                    originTag
+                  });
+                }
+              } catch (err) {
+                console.error(`Erro ao vetorizar chunk do material importado ${material.id}:`, err);
               }
-            } catch (err) {
-              console.error(`Erro ao vetorizar chunk do material importado ${material.id}:`, err);
-            }
+            }));
           }
         }
 

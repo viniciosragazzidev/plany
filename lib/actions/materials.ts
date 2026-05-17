@@ -61,14 +61,38 @@ export async function ingestWebMaterialAction(
         contentHash: crypto.randomUUID(), // Hash temporário de controle
       }).returning();
 
-      // Prepara os chunks para inserção em lote (Bulk Insert)
+      // Prepara os chunks para inserção em lote (Bulk Insert) com Vetorização
       if (chunks.length > 0) {
-        const chunksToInsert = chunks.map((chunk) => ({
+        const { getEmbedding, classifyChunk } = await import("@/lib/ai-optimizations");
+        
+        // Process chunks in parallel batches to speed up ingestion
+        const batchSize = 5;
+        const processedChunks = [];
+
+        for (let i = 0; i < chunks.length; i += batchSize) {
+          const batch = chunks.slice(i, i + batchSize);
+          const results = await Promise.all(batch.map(async (chunk) => {
+            try {
+              const [embedding, originTag] = await Promise.all([
+                getEmbedding(chunk.content),
+                classifyChunk(chunk.content)
+              ]);
+              return { content: chunk.content, embedding, originTag };
+            } catch (err) {
+              console.error(`[Materials-Action] Erro ao processar chunk:`, err);
+              return { content: chunk.content, embedding: null, originTag: "Lei" };
+            }
+          }));
+          processedChunks.push(...results);
+        }
+
+        const chunksToInsert = processedChunks.map((pc) => ({
           materialId: newMaterial.id,
           subjectId,
           topicId: editalItemId,
-          content: chunk.content,
-          originTag: 'Lei', // Classificação inicial padrão, pode ser refinada por IA depois
+          content: pc.content,
+          embedding: pc.embedding,
+          originTag: pc.originTag || 'Lei',
         }));
 
         await tx.insert(materialChunks).values(chunksToInsert);
