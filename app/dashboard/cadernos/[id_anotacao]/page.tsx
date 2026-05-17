@@ -40,6 +40,7 @@ export default function AnotacaoPage({
         id: anotacao.id,
         title: anotacao.title || "Sem título",
         content: anotacao.content,
+        benchId: anotacao.benchId,
       }}
     />
   );

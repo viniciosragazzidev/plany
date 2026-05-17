@@ -8,15 +8,17 @@ import { debounce } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Delete01Icon } from "@hugeicons/core-free-icons";
+import { Delete01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import Link from "next/link";
 
 interface AnotacaoEditorProps {
   anotacao: {
     id: string;
     title: string;
     content: string | null;
+    benchId: string;
   };
 }
 
@@ -83,7 +85,13 @@ export function AnotacaoEditor({ anotacao }: AnotacaoEditorProps) {
           />
         </div>
         <div className="flex items-center gap-2">
-           <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider bg-muted px-2 py-1 rounded">
+          <Link href={`/dashboard/bancadas/${anotacao.benchId}`} passHref>
+            <Button variant="outline" size="sm" className="gap-1 text-xs font-bold rounded-xl h-8 text-muted-foreground hover:text-primary hover:bg-primary/5">
+              Ir para a Bancada
+              <HugeiconsIcon icon={ArrowRight01Icon} size={12} />
+            </Button>
+          </Link>
+          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider bg-muted px-2 py-1 rounded">
             Salvo automaticamente
           </span>
           <ConfirmDialog

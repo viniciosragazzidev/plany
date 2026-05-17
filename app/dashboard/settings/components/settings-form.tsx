@@ -15,7 +15,8 @@ import {
   TextIcon,
   Moon01Icon,
   Sun01Icon,
-  ComputerIcon
+  ComputerIcon,
+  CreditCardIcon
 } from "@hugeicons/core-free-icons";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
@@ -127,6 +128,10 @@ export function SettingsForm({ initialSettings, user }: SettingsFormProps) {
               <TabsTrigger value="notifications" className="rounded-xl px-6 py-4 data-[state=active]:bg-background cursor-pointer data-[state=active]:shadow-sm transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
                 <HugeiconsIcon icon={Notification01Icon} size={16} />
                 Notificações
+              </TabsTrigger>
+              <TabsTrigger value="subscription" className="rounded-xl px-6 py-4 data-[state=active]:bg-background cursor-pointer data-[state=active]:shadow-sm transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+                <HugeiconsIcon icon={CreditCardIcon} size={16} />
+                Assinatura
               </TabsTrigger>
             </TabsList>
           </div>
@@ -340,6 +345,63 @@ export function SettingsForm({ initialSettings, user }: SettingsFormProps) {
                     </FormItem>
                   )}
                 />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Aba 4: Assinatura */}
+          <TabsContent value="subscription" className="animate-in fade-in slide-in-from-bottom-2 duration-400">
+            <Card className="border-border/50 py-0 bg-background/50 backdrop-blur-sm overflow-hidden rounded-[2rem] shadow-xl shadow-primary/5">
+              <CardHeader className="p-8 border-b border-border/50 bg-gradient-to-br from-primary/5 to-transparent">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                    <HugeiconsIcon icon={CreditCardIcon} size={24} />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl font-black tracking-tight">Plano & Assinatura</CardTitle>
+                    <CardDescription className="text-muted-foreground font-medium">Gerencie seu plano de acesso e dados de faturamento.</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8 space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Card do Status Atual */}
+                  <div className="p-6 rounded-2xl bg-secondary/5 border border-border/30 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+                        Acesso Liberado (Modo Dev)
+                      </span>
+                      <h4 className="text-lg font-bold text-foreground pt-1">Plano Atual: Desenvolvedor</h4>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Você está utilizando o plano de desenvolvimento do PLANY. O acesso a todas as ferramentas (Garimpo Inteligente, Upload de PDF, Simulados e Chat com IA) está liberado sem custos.
+                      </p>
+                    </div>
+                    <div className="pt-6 border-t border-border/20 mt-6 flex justify-between text-xs font-semibold text-muted-foreground">
+                      <span>Próxima Renovação:</span>
+                      <span className="text-foreground">N/A (Acesso Vitalício de Teste)</span>
+                    </div>
+                  </div>
+
+                  {/* Card do Portal */}
+                  <div className="p-6 rounded-2xl bg-secondary/5 border border-border/30 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-bold text-foreground">Gerenciador de Pagamento</h4>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        No futuro, através deste portal você poderá atualizar seus dados de cobrança, trocar de plano, baixar faturas ou cancelar sua assinatura com total autonomia.
+                      </p>
+                    </div>
+                    <div className="mt-6">
+                      <Button
+                        disabled
+                        variant="secondary"
+                        type="button"
+                        className="w-full text-xs font-bold rounded-xl h-11 border border-border/40"
+                      >
+                        Gerenciar Assinatura e Cartões (Disponível em breve)
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

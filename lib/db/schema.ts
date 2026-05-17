@@ -344,6 +344,25 @@ export const semanticCache = pgTable("semantic_cache", {
   };
 });
 
+export const subscriptions = pgTable("subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  
+  // Identificadores da integradora (Stripe/Asaas)
+  customerId: text("customer_id").unique(),
+  subscriptionId: text("subscription_id").unique(),
+  
+  // Controle de Status e Planos
+  planTier: text("plan_tier", { enum: ["free", "premium", "master"] }).default("free").notNull(),
+  status: text("status", { enum: ["active", "trialing", "past_due", "canceled", "incomplete"] }).default("active").notNull(), // Iniciará ativo por padrão temporariamente
+  
+  // Datas de Controle
+  currentPeriodEnd: timestamp("current_period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // --- RELATIONS ---
 
 export const studyBenchesRelations = relations(studyBenches, ({ many, one }) => ({
