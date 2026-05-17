@@ -26,6 +26,7 @@ export async function getBenchMaterials(benchId: string) {
       subjectId: materials.subjectId,
       editalItemId: materials.editalItemId,
       isPinned: materials.isPinned,
+      storageUrl: materials.storageUrl,
       createdAt: materials.createdAt,
     })
     .from(materials)

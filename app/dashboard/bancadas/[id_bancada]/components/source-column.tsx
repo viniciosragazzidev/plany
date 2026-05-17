@@ -37,7 +37,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { CoverageRing } from "@/components/ui/coverage-ring";
 import { Tick01Icon } from "@hugeicons/core-free-icons";
-import { ViewNoteDialog } from "./view-note-dialog";
+import { ViewMaterialDialog } from "./view-material-dialog";
 import { useBenchData } from "@/hooks/use-bench-data";
 
 interface SourceColumnProps {
@@ -469,7 +469,8 @@ function MaterialItem({ material, onDelete, onTogglePin }: {
   };
 
   const handleClick = (e: React.MouseEvent) => {
-    if (material.type === "anotacao" && !isOptimistic) {
+    const previewableTypes = ["anotacao", "link", "pdf", "text"];
+    if (previewableTypes.includes(material.type) && !isOptimistic) {
       setIsViewDialogOpen(true);
     }
   };
@@ -534,10 +535,12 @@ function MaterialItem({ material, onDelete, onTogglePin }: {
         />
       </div>
 
-      {material.type === "anotacao" && (
-        <ViewNoteDialog
+      {isViewDialogOpen && (
+        <ViewMaterialDialog
           materialId={material.id}
           title={material.title}
+          type={material.type}
+          storageUrl={material.storageUrl}
           open={isViewDialogOpen}
           onOpenChange={setIsViewDialogOpen}
         />

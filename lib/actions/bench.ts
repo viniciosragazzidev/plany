@@ -286,6 +286,21 @@ export async function addMaterial(formData: FormData): Promise<ActionResponse<{ 
     let content = textContent || "";
     const storageUrl = url || "";
 
+    // Verifica duplicados se for um link externo
+    if (type === "link" && storageUrl) {
+      const existing = await db.query.materials.findFirst({
+        where: (m, { and, eq }) =>
+          and(
+            eq(m.benchId, benchId),
+            eq(m.storageUrl, storageUrl)
+          )
+      });
+
+      if (existing) {
+        return actionError("Este link já foi adicionado como material nesta bancada!");
+      }
+    }
+
     if (type === "pdf" && file) {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
@@ -827,6 +842,25 @@ export async function importWebMaterials(webSourceIds: string[]) {
     // Import each source as a material
     for (const source of sourcesToImport) {
       try {
+        // Verifica se o material já foi importado nesta bancada (Deduplicação)
+        const existingMaterial = await db.query.materials.findFirst({
+          where: (m, { and, eq }) =>
+            and(
+              eq(m.benchId, benchId),
+              eq(m.storageUrl, source.sourceUrl)
+            )
+        });
+
+        if (existingMaterial) {
+          console.log(`[Import] Material já importado: "${source.title}" (ID: ${existingMaterial.id})`);
+          // Marca a fonte como importada no garimpo de qualquer forma para não reaparecer
+          await db
+            .update(webSources)
+            .set({ status: "imported" })
+            .where(eq(webSources.id, source.id as any));
+          continue;
+        }
+
         let subjectId: string | null = null;
         let editalItemId: string | null = null;
 

@@ -44,6 +44,19 @@ export async function ingestWebMaterialAction(
   title: string
 ): Promise<ActionResponse<any>> {
   try {
+    // 0. Verifica se o material já foi importado (Deduplicação)
+    const existing = await db.query.materials.findFirst({
+      where: (m, { and, eq }) =>
+        and(
+          eq(m.benchId, benchId),
+          eq(m.storageUrl, url)
+        )
+    });
+
+    if (existing) {
+      return actionError("Este material já foi importado nesta bancada de estudos!");
+    }
+
     // 1. Executa a engrenagem do Firecrawl + Tokenizer
     const { markdownCompleto, chunks } = await scrapeAndProcessSource(url);
 
