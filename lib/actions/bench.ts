@@ -1,8 +1,8 @@
 'use server'
 
 import { db } from "@/lib/db";
-import { studyBenches, editalItems, materials, subjects, webSources, materialChunks, quizzes } from "@/lib/db/schema";
-import { eq, sql, and, desc } from "drizzle-orm";
+import { studyBenches, editalItems, materials, subjects, webSources, materialChunks, quizzes, publicEditais } from "@/lib/db/schema";
+import { eq, sql, and, desc, ilike } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { generateSearchQueries, QueryGenInput, researchEmptyEditalTopics, beautifyMaterialTitle } from "@/lib/web-research";
@@ -21,6 +21,10 @@ import {
   parseAndIndexEdital 
 } from "./public-edital";
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
+
+import { tokenizer } from "@/lib/services/ai/text-processor";
 
 export async function processEditalPDF(formData: FormData): Promise<ActionResponse<{ topicCount: number }>> {
   const file = formData.get("file") as File;
@@ -42,9 +46,27 @@ export async function processEditalPDF(formData: FormData): Promise<ActionRespon
     console.log("[processEditalPDF] Extraindo texto estruturado localmente...");
     const structuredText = await extractStructuredText(buffer);
 
+    // TOKENIZER INTEGRATION
+    console.log("[processEditalPDF] Tokenizando texto...");
+    const chunks = await tokenizer(structuredText);
+    console.log(`[processEditalPDF] Texto fatiado em ${chunks.length} blocos.`);
+    
+    // DEBUG: Write to file at root
+    try {
+      const debugFilePath = path.join(process.cwd(), "debug_tokenized_text.txt");
+      const debugContent = chunks.map((c, i) => `--- BLOCk ${i+1} (${c.estimatedTokens} tokens) ---\n${c.content}\n`).join("\n\n");
+      fs.writeFileSync(debugFilePath, debugContent);
+      console.log(`[processEditalPDF] DEBUG: Texto tokenizado salvo em ${debugFilePath}`);
+    } catch (debugErr) {
+      console.error("[processEditalPDF] Falha ao salvar arquivo de debug:", debugErr);
+    }
+    
+    // Use the first chunk (header) for metadata extraction - it's usually enough and faster
+    const headerContext = chunks[0]?.content || structuredText.substring(0, 8000);
+
     // Phase 2: AI Metadata Extraction (Lightweight)
     console.log("[processEditalPDF] Phase 2: Extraindo metadados...");
-    const metadataRes = await analyzeEditalMetadata(structuredText);
+    const metadataRes = await analyzeEditalMetadata(headerContext);
     if (!metadataRes.success || !metadataRes.data) {
       throw new Error(metadataRes.error || "Falha ao extrair metadados do edital");
     }
@@ -64,6 +86,8 @@ export async function processEditalPDF(formData: FormData): Promise<ActionRespon
 
     // Phase 4: Full Parsing & Public Indexing
     console.log("[processEditalPDF] Phase 4: Parsing completo e indexação pública...");
+    // For full parsing, if the file is massive, we might need a multi-chunk strategy, 
+    // but for now, we'll pass the full text as the prompt handles up to 100k chars.
     const indexRes = await parseAndIndexEdital(benchId, structuredText, metadata, fileHash);
     if (!indexRes.success) throw new Error(indexRes.error);
 
@@ -89,27 +113,90 @@ export async function extractBenchDataFromEdital(formData: FormData) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
+    // Calculate File Hash for deduplication
+    const fileHash = crypto.createHash('md5').update(buffer).digest('hex');
+
     console.log("[extractBenchDataFromEdital] Extraindo texto estruturado localmente via pdfjs-dist...");
     const tExtract = Date.now();
     const structuredText = await extractStructuredText(buffer);
     console.log(`[extractBenchDataFromEdital] Texto extraído localmente em ${Date.now() - tExtract}ms`);
 
-    // SINGLE AI CALL: Native PDF -> Markdown + JSON
-    console.log("[extractBenchDataFromEdital] Enviando texto estruturado para Gemini...");
-    const t1 = Date.now();
+    // TOKENIZER INTEGRATION
+    console.log("[extractBenchDataFromEdital] Tokenizando texto...");
+    const chunks = await tokenizer(structuredText);
+    console.log(`[extractBenchDataFromEdital] Texto fatiado em ${chunks.length} blocos.`);
+
+    // DEBUG: Write to file at root
+    try {
+      const debugFilePath = path.join(process.cwd(), "debug_tokenized_text_onboarding.txt");
+      const debugContent = chunks.map((c, i) => `--- BLOCk ${i+1} (${c.estimatedTokens} tokens) ---\n${c.content}\n`).join("\n\n");
+      fs.writeFileSync(debugFilePath, debugContent);
+      console.log(`[extractBenchDataFromEdital] DEBUG: Texto tokenizado salvo em ${debugFilePath}`);
+    } catch (debugErr) {
+      console.error("[extractBenchDataFromEdital] Falha ao salvar arquivo de debug:", debugErr);
+    }
+    
+    // Use the first chunk (header) for metadata extraction - it's usually enough and faster
+    const headerContext = chunks[0]?.content || structuredText.substring(0, 8000);
+
+    // Phase 2: Metadata Extraction (Lightweight)
+    console.log("[extractBenchDataFromEdital] Phase 2: Extraindo metadados...");
+    const metadataRes = await analyzeEditalMetadata(headerContext);
+    if (!metadataRes.success || !metadataRes.data) {
+      throw new Error(metadataRes.error || "Falha ao extrair metadados do edital");
+    }
+    const metadata = metadataRes.data;
+
+    // Phase 3: Secondary Deduplication Check
+    console.log("[extractBenchDataFromEdital] Phase 3: Checando duplicatas...");
+    const existingEdital = await db.query.publicEditais.findFirst({
+      where: and(
+        ilike(publicEditais.institution, metadata.institution),
+        ilike(publicEditais.role, metadata.role),
+        eq(publicEditais.year, metadata.year)
+      ),
+      with: {
+        subjects: {
+          with: {
+            topics: true
+          }
+        }
+      }
+    });
+
+    if (existingEdital) {
+      console.log("[extractBenchDataFromEdital] Cache Hit! Retornando dados públicos...");
+      const subjects = existingEdital.subjects.map(s => s.name);
+      const items = existingEdital.subjects.flatMap(s => s.topics.map(t => ({
+        category: s.name,
+        topic: t.name,
+        weight: 1
+      })));
+
+      return {
+        success: true,
+        data: {
+          publicEditalId: existingEdital.id,
+          goalName: `${existingEdital.institution} - ${existingEdital.role}`,
+          examBoard: existingEdital.institution,
+          targetDate: undefined,
+          weeklyHours: 20,
+          subjects,
+          editalItems: items,
+          examNotice: "" // Markdown not stored in publicEdital currently, user will get it from private if they create
+        }
+      };
+    }
+
+    // Phase 4: Full Parsing for NEW Edital
+    console.log("[extractBenchDataFromEdital] Phase 4: Parsing completo para novo edital...");
     const extractSystemPrompt = `Você é um Analista Acadêmico especializado em extração de dados estruturados.
     Sua missão é extrair o CONTEÚDO PROGRAMÁTICO e METADADOS do texto estruturado do edital fornecido para configurar um plano de estudos.
-    Você também deve converter o texto do edital para um Markdown estruturado de alta qualidade (removendo ruídos de páginas, formatando tabelas e listas).
+    Você também deve converter o texto do edital para um Markdown estruturado de alta qualidade.
     
     Retorne APENAS um JSON válido no seguinte formato:
     {
       "markdown": "Todo o conteúdo do edital convertido para Markdown limpo e estruturado.",
-      "metadata": {
-        "goalName": "Nome do Concurso",
-        "examBoard": "Banca (ex: FGV, CESPE, Vunesp)",
-        "targetDate": "YYYY-MM-DD",
-        "weeklyHours": 20
-      },
       "subjects": ["Disciplina 1", "Disciplina 2"],
       "items": [
         { "category": "Nome da Disciplina", "topic": "Nome do Tópico", "description": "Breve detalhamento", "weight": 1-5 }
@@ -121,7 +208,7 @@ export async function extractBenchDataFromEdital(formData: FormData) {
       contents: [{ 
         role: "user", 
         parts: [
-          { text: `TEXTO ESTRUTURADO DO EDITAL:\n\n${structuredText.substring(0, 100000)}` }
+          { text: `TEXTO DO EDITAL:\n\n${structuredText.substring(0, 100000)}` }
         ] 
       }],
       forceCloud: true,
@@ -132,27 +219,26 @@ export async function extractBenchDataFromEdital(formData: FormData) {
     });
 
     const text = response.text;
-    console.log(`[extractBenchDataFromEdital] IA concluiu em ${Date.now() - t1}ms`);
     if (!text) throw new Error("A IA não retornou uma resposta válida.");
     
     const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
     const parsedData = JSON.parse(jsonStr);
-    const metadata = parsedData.metadata || {};
-    const subjects = parsedData.subjects || [];
-    const items = parsedData.items || [];
-    const markdown = parsedData.markdown || "";
 
     console.log(`[extractBenchDataFromEdital] Tempo TOTAL: ${Date.now() - t0}ms`);
     return { 
       success: true, 
       data: {
-        goalName: metadata?.goalName,
-        examBoard: metadata?.examBoard,
-        targetDate: metadata?.targetDate,
-        weeklyHours: metadata?.weeklyHours || 20,
-        subjects: subjects || [],
-        editalItems: items || [],
-        examNotice: markdown
+        publicEditalId: null,
+        goalName: metadata.contestName || `${metadata.institution} - ${metadata.role}`,
+        examBoard: metadata.institution,
+        targetDate: undefined,
+        weeklyHours: 20,
+        subjects: parsedData.subjects || [],
+        editalItems: parsedData.items || [],
+        examNotice: parsedData.markdown,
+        // Carry forward metadata for final indexing
+        rawMetadata: metadata,
+        fileHash
       } 
     };
   } catch (error: any) {

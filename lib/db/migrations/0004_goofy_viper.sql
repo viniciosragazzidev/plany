@@ -1,0 +1,1 @@
+ALTER TABLE "public_editais" ADD COLUMN "contest_name" text;

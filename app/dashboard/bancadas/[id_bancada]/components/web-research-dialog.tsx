@@ -112,15 +112,15 @@ export function WebResearchDialog({
     }
 
     if (scenario === "B") {
-      // Scenario B: Topics already exist. Let's group them for selection.
+      // Scenario B: Topics already exist. Group them for selection.
       const grouped: Record<string, string[]> = {};
       editalItems.forEach(item => {
         if (!grouped[item.category]) grouped[item.category] = [];
         grouped[item.category].push(item.topic);
       });
-      
+
       setDiscoveredTopics(grouped);
-      setSelectedTopics({}); // Start empty to force user to choose up to 3
+      setSelectedTopics({});
       setStep("confirming_topics");
       return;
     }
@@ -128,12 +128,32 @@ export function WebResearchDialog({
     if (scenario === "A") {
       setStep("discovering_topics");
       const discovery = await discoverTopicsAction(benchId);
-      if (discovery.success) {
-        setDiscoveredTopics(discovery.data);
-        setSelectedTopics({}); // Start empty - user MUST pick up to 3
-        setStep("confirming_topics");
-        
-        toast.info("Identificamos novos tópicos! Escolha até 3 para garimpar materiais.");
+
+      if (discovery.success && discovery.data) {
+        // IMPROVEMENT: Save ALL discovered topics immediately
+        setIsImporting(true);
+        const saveRes = await bulkCreateTopicsAction(benchId, discovery.data);
+
+        if (saveRes.success) {
+          // Update Cache
+          const { newSubjects, newTopics } = saveRes.data || {};
+          if (newSubjects?.length) queryClient.setQueryData(['bench-subjects', benchId], (old: any) => [...(old || []), ...newSubjects]);
+          if (newTopics?.length) queryClient.setQueryData(['bench-edital-items', benchId], (old: any) => [...(old || []), ...newTopics]);
+
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['bench-subjects', benchId] }),
+            queryClient.invalidateQueries({ queryKey: ['bench-edital-items', benchId] })
+          ]);
+
+          setDiscoveredTopics(discovery.data);
+          setSelectedTopics({}); // Force selection of 3
+          setStep("confirming_topics");
+          toast.success("Tópicos do edital salvos! Escolha agora os 3 que deseja garimpar.");
+        } else {
+          toast.error("Falha ao salvar tópicos descobertos.");
+          setStep("idle");
+        }
+        setIsImporting(false);
       } else {
         toast.error(discovery.message);
         setStep("idle");
@@ -142,35 +162,7 @@ export function WebResearchDialog({
   };
 
   const handleSaveTopicsAndResearch = async () => {
-    setIsImporting(true);
-    
-    // Check if we need to save new topics first (Scenario A)
-    const validation = await validateGarimpoState(benchId);
-    if (validation.data?.scenario === "A") {
-      const res = await bulkCreateTopicsAction(benchId, selectedTopics);
-      if (res.success) {
-        toast.success(res.message);
-        const { newSubjects, newTopics } = res.data || {};
-        if (newSubjects && newSubjects.length > 0) {
-          queryClient.setQueryData(['bench-subjects', benchId], (old: any) => [...(old || []), ...newSubjects]);
-        }
-        if (newTopics && newTopics.length > 0) {
-          queryClient.setQueryData(['bench-edital-items', benchId], (old: any) => [...(old || []), ...newTopics]);
-        }
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ['bench-subjects', benchId] }),
-          queryClient.invalidateQueries({ queryKey: ['bench-edital-items', benchId] })
-        ]);
-        router.refresh();
-      } else {
-        toast.error(res.error || "Erro ao salvar tópicos");
-        setIsImporting(false);
-        return;
-      }
-    }
-
-    // Now start material research for the selected topics
-    // Format: "Category: Topic"
+    // Determine the topics to research from the selection
     const topicsToResearch: string[] = [];
     Object.entries(selectedTopics).forEach(([category, topics]) => {
       topics.forEach(topic => {
@@ -178,6 +170,13 @@ export function WebResearchDialog({
       });
     });
 
+    if (topicsToResearch.length === 0) {
+      toast.error("Selecione pelo menos um tópico para garimpar.");
+      return;
+    }
+
+    setIsImporting(true);
+    // Start research for the SELECTED topics only
     await (startBackgroundResearch as any)(topicsToResearch);
     setIsImporting(false);
   };
@@ -261,7 +260,7 @@ export function WebResearchDialog({
   );
 
   const isBusy = isGlobalResearching || step === "validating" || step === "discovering_topics" || isImporting;
-  
+
   let buttonText = "Garimpo Digital";
   if (isGlobalResearching) buttonText = "Garimpando...";
   else if (step === "validating") buttonText = "Validando...";
@@ -275,7 +274,7 @@ export function WebResearchDialog({
         // Only reset to idle if we are completely done or haven't started. 
         // Don't kill background UI state for active tasks!
         if (!val && !isGlobalResearching && step !== "validating" && step !== "discovering_topics" && step !== "confirming_topics" && step !== "researching_materials" && step !== "results") {
-           setStep("idle");
+          setStep("idle");
         }
       }}>
         <DialogTrigger
@@ -295,7 +294,7 @@ export function WebResearchDialog({
           }
         />
 
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] z-500 flex flex-col p-0 overflow-hidden border-none bg-background shadow-2xl">
+        <DialogContent className="sm:max-w-2xl max-h-[85vh]  flex flex-col p-0 overflow-hidden border-none bg-background shadow-2xl">
           <div className="p-6 border-b border-border/50 bg-background">
             <DialogHeader>
               <div className="space-y-2">
@@ -376,26 +375,50 @@ export function WebResearchDialog({
                 </div>
 
                 <div className="space-y-4">
-                  {Object.entries(discoveredTopics).map(([category, topics]) => (
-                    <div key={category} className="space-y-2">
-                      <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-2">{category}</h4>
-                      <Card className="overflow-hidden border-border/50 rounded-2xl bg-secondary/5">
-                        <div className="p-2 space-y-1">
-                          {topics.map(topic => (
-                            <div key={topic} className="flex items-center gap-3 p-2 hover:bg-background/50 rounded-xl transition-colors group">
-                              <Checkbox
-                                id={topic}
-                                checked={selectedTopics[category]?.includes(topic)}
-                                onCheckedChange={() => toggleTopicSelection(category, topic)}
-                                className="border-primary/30 data-[state=checked]:bg-primary"
-                              />
-                              <Label htmlFor={topic} className="text-xs font-bold leading-tight flex-1 cursor-pointer group-hover:text-primary transition-colors">{topic}</Label>
-                            </div>
-                          ))}
-                        </div>
-                      </Card>
-                    </div>
-                  ))}
+                  <Accordion multiple={true} defaultValue={["categories"]} className="w-full">
+                    <AccordionItem value="categories" className="border-none">
+                      <AccordionTrigger className="hover:no-underline py-2 px-4 rounded-xl bg-primary/5 hover:bg-primary/10 transition-all text-[10px] font-black text-primary uppercase tracking-[0.2em] border border-primary/10 mb-4">
+                        Disciplinas Mapeadas
+                      </AccordionTrigger>
+                      <AccordionContent className="p-0 space-y-4">
+                        <Accordion multiple={true} defaultValue={Object.keys(discoveredTopics)} className="w-full space-y-4">
+                        {Object.entries(discoveredTopics).map(([category, topics]) => (
+                          <AccordionItem key={category} value={category} className="border-none">
+                            <AccordionTrigger className="hover:no-underline py-0 border-none group">
+                              <div className="flex items-center gap-2 flex-1 text-left min-w-0">
+                                <div className="w-1.5 h-1.5 rounded-full bg-primary/40 group-data-[state=open]:bg-primary transition-colors shrink-0" />
+                                <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] truncate flex-1" title={category}>{category}</h4>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-2 pb-0 border-none">
+                              <Card className="overflow-hidden border-border/50 rounded-2xl bg-secondary/5">
+                                <div className="p-2 space-y-1">
+                                  {topics.map(topic => (
+                                    <div key={topic} className="flex items-center gap-3 p-2 hover:bg-background/50 rounded-xl transition-colors group">
+                                      <Checkbox
+                                        id={topic}
+                                        checked={selectedTopics[category]?.includes(topic)}
+                                        onCheckedChange={() => toggleTopicSelection(category, topic)}
+                                        className="border-primary/30 data-[state=checked]:bg-primary"
+                                      />
+                                      <Label
+                                        htmlFor={topic}
+                                        className="text-xs font-bold leading-tight flex-1 cursor-pointer group-hover:text-primary transition-colors truncate max-w-[150px] inline-block"
+                                        title={topic}
+                                      >
+                                        {topic}
+                                      </Label>
+                                    </div>
+                                  ))}
+                                </div>
+                              </Card>
+                            </AccordionContent>
+                          </AccordionItem>
+                        ))}
+                        </Accordion>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
                 </div>
               </div>
             )}
@@ -410,25 +433,25 @@ export function WebResearchDialog({
                     <p className="text-xs font-black text-emerald-600 uppercase tracking-widest">Garimpo Finalizado</p>
                     <p className="text-[11px] font-bold text-emerald-600/70">Encontramos {results.length} materiais de alta autoridade.</p>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={handleStartGarimpo} className="h-9 px-4 rounded-xl text-xs font-bold gap-2 hover:bg-emerald-500/10">
+                  <button onClick={handleStartGarimpo} className="h-9 px-4 rounded-xl text-xs font-bold gap-2 hover:bg-emerald-500/10 flex items-center transition-colors">
                     <HugeiconsIcon icon={Search01Icon} size={14} />
                     Refazer
-                  </Button>
+                  </button>
                 </div>
 
-                <Accordion multiple className="w-full space-y-3">
+                <Accordion multiple={true} className="w-full space-y-3">
                   {Object.entries(groupedByTopic).map(([topic, items]) => (
                     <AccordionItem key={topic} value={topic} className="border-none">
                       <AccordionTrigger className="hover:no-underline p-4 rounded-2xl bg-secondary/5 hover:bg-secondary/10 transition-all border border-border/50 group">
-                        <div className="flex items-center gap-4 flex-1 text-left">
+                        <div className="flex items-center gap-4 flex-1 text-left min-w-0">
                           <div className="w-2 h-2 rounded-full bg-primary/40 group-data-[state=open]:bg-primary transition-colors" />
-                          <span className="font-black text-sm tracking-tight">{topic}</span>
-                          <Badge variant="secondary" className="ml-auto text-[10px] font-black uppercase tracking-widest bg-primary/10 text-primary border-none px-2.5">
+                          <span className="font-black text-sm tracking-tight truncate flex-1" title={topic}>{topic}</span>
+                          <Badge variant="secondary" className="ml-auto text-[10px] font-black uppercase tracking-widest bg-primary/10 text-primary border-none px-2.5 shrink-0">
                             {items.length} links
                           </Badge>
                         </div>
                       </AccordionTrigger>
-                      <AccordionContent className="pt-3 pb-1 px-1">
+                      <AccordionContent className="pt-3 pb-1 px-0">
                         <div className="space-y-3">
                           {items.map((item) => (
                             <div

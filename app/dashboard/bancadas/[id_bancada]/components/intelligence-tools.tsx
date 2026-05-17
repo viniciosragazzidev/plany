@@ -370,13 +370,19 @@ export function IntelligenceTools({
                {/* Simplified Quiz Config List */}
                <div className="space-y-4">
                   {categories.map(cat => (
-                    <div key={cat} className="space-y-2">
-                       <h5 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{cat}</h5>
+                    <div key={cat} className="space-y-2 min-w-0">
+                       <h5 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest truncate" title={cat}>{cat}</h5>
                        <div className="space-y-1.5 pl-2 border-l-2 border-primary/10">
                           {editalItems.filter(i => i.category === cat).map(item => (
-                            <div key={item.id} className="flex items-center gap-2">
+                            <div key={item.id} className="flex items-center gap-2 min-w-0">
                                <Checkbox id={item.id} checked={selectedEditalItems.includes(item.id)} onCheckedChange={(checked) => checked ? setSelectedEditalItems(prev => [...prev, item.id]) : setSelectedEditalItems(prev => prev.filter(id => id !== item.id))} />
-                               <Label htmlFor={item.id} className="text-[11px] font-medium leading-tight line-clamp-1">{item.topic}</Label>
+                               <Label 
+                                  htmlFor={item.id} 
+                                  className="text-[11px] font-medium leading-tight truncate flex-1 cursor-pointer"
+                                  title={item.topic}
+                                >
+                                  {item.topic}
+                                </Label>
                             </div>
                           ))}
                        </div>

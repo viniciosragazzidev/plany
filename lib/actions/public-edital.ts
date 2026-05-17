@@ -107,27 +107,37 @@ export async function selectPublicEdital(benchId: string, publicEditalId: string
  */
 export async function analyzeEditalMetadata(text: string): Promise<ActionResponse<{ institution: string, role: string, year: string, contestName: string }>> {
   try {
-    const prompt = `Analyze the provided exam text header. 
-    Identify:
-    1. The Governing Institution (e.g., Marinha do Brasil, INSS).
-    2. The Specific Contest Name/Acronym (e.g., CFAQ-MOC, CAAQ-CTS, Concurso Público).
-    3. The Target Roles (e.g., Moço de Convés, Agente Administrativo).
-    4. The Year.
+    const prompt = `Você é um Analista de Editais e Especialista em Concursos. 
+    Analise o texto do cabeçalho do edital fornecido e identifique os dados exatos.
 
-    Output strictly a RAW JSON format: 
+    MISSÃO:
+    1. INSTITUTION: Nome da instituição organizadora ou órgão (ex: Marinha do Brasil, INSS, Polícia Federal).
+    2. ROLE: O cargo ou cargos descritos no edital.
+    3. YEAR: O ano de publicação do edital.
+    4. CONTEST_NAME: Um título bonito e completo para o concurso, incluindo siglas se houver. 
+       Exemplos: 
+       - "Processo Seletivo para Cursos de Formação de Aquaviários (CFAQ-MOC e CAAQ-CTS) 2026"
+       - "Concurso Público para Agente e Escrivão da Polícia Federal 2025"
+       - "Exame Unificado da OAB XXXIX 2024"
+
+    REGRAS DE OURO:
+    - O CONTEST_NAME deve ser formal e conter as informações que um aluno usaria para identificar o concurso rapidamente.
+    - Se encontrar siglas como CFAQ, CAAQ, etc., inclua-as no nome.
+    - O Ano deve ser estritamente YYYY.
+
+    Retorne APENAS um JSON válido no formato:
     { 
-      "institution": "Full Institution Name", 
-      "role": "Specific Roles or Acronym", 
+      "institution": "Nome do Órgão", 
+      "role": "Cargo(s)", 
       "year": "YYYY",
-      "contestName": "Specific Name of the Contest (e.g. Processo Seletivo CFAQ 2026)"
-    } 
-    Do not extract subjects yet.`;
+      "contestName": "Nome Bonito e Completo do Concurso"
+    }`;
 
     const response = await generateAIContent({
       model: "gemini-2.5-flash",
       contents: [{ 
         role: "user", 
-        parts: [{ text: `HEADER TEXT:\n\n${text.substring(0, 5000)}` }] 
+        parts: [{ text: `TEXTO DO EDITAL (TOPO):\n\n${text.substring(0, 8000)}` }] 
       }],
       config: {
         systemInstruction: { parts: [{ text: prompt }] },
@@ -144,16 +154,51 @@ export async function analyzeEditalMetadata(text: string): Promise<ActionRespons
 
 /**
  * Phase 3: Secondary Deduplication Check
+ * Robust check by File Hash OR Normalized Metadata
  */
-export async function checkExistingEdital(metadata: { institution: string, role: string, year: string }): Promise<string | null> {
-  const match = await db.query.publicEditais.findFirst({
+export async function checkExistingEdital(metadata: { institution: string, role: string, year: string, contestName: string }, fileHash?: string): Promise<string | null> {
+  // 1. Exact File Hash Check (Highest Confidence)
+  if (fileHash) {
+    const byHash = await db.query.publicEditais.findFirst({
+      where: eq(publicEditais.fileHash, fileHash)
+    });
+    if (byHash) return byHash.id;
+  }
+
+  // 2. Normalized Metadata Check
+  // We use a combination of Institution + Year + fuzzy Role matching
+  const potentialMatches = await db.query.publicEditais.findMany({
     where: and(
-      ilike(publicEditais.institution, metadata.institution),
-      ilike(publicEditais.role, metadata.role),
+      ilike(publicEditais.institution, `%${metadata.institution.substring(0, 5)}%`), // Partial organ name
       eq(publicEditais.year, metadata.year)
     )
   });
-  return match?.id || null;
+
+  if (potentialMatches.length > 0) {
+    // Look for Role/Acronym matches (e.g., CFAQ)
+    const roleUpper = metadata.role.toUpperCase();
+    const contestUpper = metadata.contestName.toUpperCase();
+    
+    const exactMatch = potentialMatches.find(m => {
+        const mRole = m.role.toUpperCase();
+        const mSlug = m.slugName.toUpperCase();
+        
+        // If the acronym (like CFAQ) is present in both, it's likely a duplicate
+        const acronyms = ["CFAQ", "CAAQ", "PF", "PRF", "INSS", "OAB", "RECEITA"];
+        for (const acro of acronyms) {
+            if ((roleUpper.includes(acro) || contestUpper.includes(acro)) && (mRole.includes(acro) || mSlug.includes(acro))) {
+                return true;
+            }
+        }
+        
+        // Or if roles are very similar
+        return mRole.includes(roleUpper) || roleUpper.includes(mRole);
+    });
+
+    if (exactMatch) return exactMatch.id;
+  }
+
+  return null;
 }
 
 /**
@@ -223,7 +268,8 @@ export async function parseAndIndexEdital(benchId: string, fullText: string, met
           examNotice: parsed.markdown,
           publicEditalId: pEdital.id,
           goalName: metadata.contestName || `${metadata.institution} - ${metadata.role} (${metadata.year})`,
-          hasDiscoveredTopics: true
+          hasDiscoveredTopics: true,
+          researchStatus: "idle"
         })
         .where(eq(studyBenches.id, benchId));
 

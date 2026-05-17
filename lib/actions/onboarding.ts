@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { profiles, studyBenches, subjects, editalItems } from "@/lib/db/schema";
+import { profiles, studyBenches, subjects, editalItems, publicEditais, publicSubjects, publicTopics } from "@/lib/db/schema";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -9,7 +9,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 
 import { ActionResponse, actionError, actionSuccess } from "./types";
-import { selectPublicEdital } from "./public-edital";
+import { selectPublicEdital, parseAndIndexEdital, checkExistingEdital } from "./public-edital";
 
 export async function completeOnboarding(data: {
   name: string;
@@ -23,6 +23,9 @@ export async function completeOnboarding(data: {
   examBoard?: string;
   examNotice?: string;
   publicEditalId?: string | null;
+  // Metadata for indexing if new
+  rawMetadata?: { institution: string, role: string, year: string, contestName: string };
+  fileHash?: string;
 }) {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -90,9 +93,14 @@ export async function completeOnboarding(data: {
       }
     });
 
-    // 5. Se tiver publicEditalId e nenhuma matéria foi passada, clonar automaticamente
+    // 5. Public Library Contribution
     if (data.publicEditalId && data.subjects.length === 0) {
+      // Direct clone
       await selectPublicEdital(benchId, data.publicEditalId);
+    } else if (!data.publicEditalId && data.rawMetadata && data.fileHash && data.subjects.length > 0) {
+      // New Edital Indexing
+      // We don't want to re-parse with AI here, we use the already parsed subjects/topics
+      await indexNewPublicEdital(data.rawMetadata, data.fileHash, data.subjects, data.editalItems || []);
     }
     
     revalidatePath("/dashboard");
@@ -115,6 +123,8 @@ export async function createStudyBench(data: {
   examBoard?: string;
   examNotice?: string;
   publicEditalId?: string | null;
+  rawMetadata?: { institution: string, role: string, year: string, contestName: string };
+  fileHash?: string;
 }) {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -178,9 +188,11 @@ export async function createStudyBench(data: {
       return { bench, subjects: createdSubjects };
     });
 
-    // 5. Se tiver publicEditalId e nenhuma matéria foi passada, clonar automaticamente
+    // 5. Public Library Contribution
     if (data.publicEditalId && data.subjects.length === 0) {
       await selectPublicEdital(result.bench.id, data.publicEditalId);
+    } else if (!data.publicEditalId && data.rawMetadata && data.fileHash && data.subjects.length > 0) {
+      await indexNewPublicEdital(data.rawMetadata, data.fileHash, data.subjects, data.editalItems || []);
     }
 
     revalidatePath("/dashboard");
@@ -190,5 +202,59 @@ export async function createStudyBench(data: {
   } catch (error) {
     console.error("Erro ao criar bancada:", error);
     return { error: "Falha ao criar a bancada. Tente novamente." };
+  }
+}
+
+/**
+ * Helper to index a new public edital without AI re-parsing.
+ */
+async function indexNewPublicEdital(
+  metadata: { institution: string, role: string, year: string, contestName: string },
+  fileHash: string,
+  subjectsData: { title: string }[],
+  topicsData: { category: string; topic: string }[]
+) {
+  try {
+    // 1. SECONDARY CHECK: Before indexing, check if it exists (Atomic-ish)
+    const existingId = await checkExistingEdital(metadata, fileHash);
+    if (existingId) {
+        console.log(`[indexNewPublicEdital] Skipping duplicate index for: ${metadata.contestName}`);
+        return;
+    }
+
+    const baseForSlug = metadata.contestName || `${metadata.institution} ${metadata.role} ${metadata.year}`;
+    const slugName = baseForSlug.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+
+    await db.transaction(async (tx) => {
+      // 1. Create Public Edital
+      const [pEdital] = await tx.insert(publicEditais).values({
+        slugName,
+        contestName: metadata.contestName,
+        institution: metadata.institution,
+        role: metadata.role,
+        year: metadata.year,
+        fileHash
+      }).returning();
+
+
+      // 2. Index Subjects and Topics
+      for (const sub of subjectsData) {
+        const [pSub] = await tx.insert(publicSubjects).values({
+          publicEditalId: pEdital.id,
+          name: sub.title
+        }).returning();
+
+        const relatedTopics = topicsData.filter(t => t.category === sub.title);
+        for (const top of relatedTopics) {
+          await tx.insert(publicTopics).values({
+            publicSubjectId: pSub.id,
+            name: top.topic
+          });
+        }
+      }
+    });
+  } catch (err) {
+    console.error("Failed to index new public edital in background:", err);
+    // Non-blocking for the user
   }
 }

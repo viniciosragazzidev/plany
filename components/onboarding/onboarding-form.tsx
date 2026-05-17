@@ -77,6 +77,9 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
     editalItems: [] as { category: string; topic: string; description?: string; weight?: number }[],
     examNotice: "",
     publicEditalId: null as string | null,
+    // For background indexing
+    rawMetadata: null as any,
+    fileHash: null as string | null,
   });
 
   const handleSearch = useThrottledCallback(async (query: string) => {
@@ -130,7 +133,7 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
     try {
       const result = await extractBenchDataFromEdital(formDataUpload);
       if (result.success && result.data) {
-        const { goalName, targetDate, examBoard, weeklyHours, subjects, editalItems, examNotice } = result.data;
+        const { goalName, targetDate, examBoard, subjects, editalItems, examNotice, publicEditalId, rawMetadata, fileHash } = result.data;
 
         let parsedDate: Date | undefined = undefined;
         if (targetDate) {
@@ -155,23 +158,30 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
           goalName: goalName || prev.goalName,
           examBoard: examBoard || prev.examBoard,
           targetDate: parsedDate || prev.targetDate,
-          weeklyHours: weeklyHours?.toString() || prev.weeklyHours,
-          subjects: [
-            ...prev.subjects,
-            ...(subjects || []).map((s: string) => ({ title: s, priority: 3, colorTag: "#3b82f6" }))
-          ],
+          subjects: subjects.map((s: string) => ({
+            title: s,
+            priority: 3,
+            colorTag: "#3b82f6"
+          })),
           editalItems: editalItems || [],
-          examNotice: examNotice || ""
+          examNotice: examNotice || "",
+          publicEditalId: publicEditalId || null,
+          rawMetadata: rawMetadata || null,
+          fileHash: fileHash || null
         }));
 
-        toast.success("Dados extraídos com sucesso!", {
-          description: "Revisamos o edital e preenchemos os campos para você."
+        toast.success("Edital analisado com sucesso!", {
+          description: publicEditalId ? "Encontramos este edital na biblioteca!" : "Mapeamos os tópicos para você."
         });
+
+        if (mode === "onboarding") {
+           setStep(3);
+        }
       } else {
-        throw new Error(result.error || "Falha na extração");
+        toast.error("Erro ao analisar edital: " + result.error);
       }
-    } catch (error: any) {
-      toast.error("Erro ao processar edital: " + error.message);
+    } catch (error) {
+      toast.error("Falha na extração mágica.");
     } finally {
       setIsExtracting(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -250,13 +260,15 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
 
     setIsPending(true);
     try {
+      const payload = {
+        ...formData,
+        targetDate: formData.targetDate.toISOString(),
+        weeklyHours: parseInt(formData.weeklyHours),
+        studentLevel: formData.studentLevel,
+      };
+
       if (mode === "onboarding") {
-        const result = await completeOnboarding({
-          ...formData,
-          targetDate: formData.targetDate.toISOString(),
-          weeklyHours: parseInt(formData.weeklyHours),
-          studentLevel: formData.studentLevel,
-        });
+        const result = await completeOnboarding(payload as any);
 
         if (result?.error) {
           toast.error(result.error);
@@ -265,15 +277,7 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
           onSuccess?.();
         }
       } else {
-        const result = await createStudyBench({
-          goalName: formData.goalName,
-          targetDate: formData.targetDate.toISOString(),
-          weeklyHours: parseInt(formData.weeklyHours),
-          subjects: formData.subjects,
-          editalItems: formData.editalItems,
-          examBoard: formData.examBoard,
-          examNotice: formData.examNotice,
-        });
+        const result = await createStudyBench(payload as any);
 
         if (result?.error) {
           toast.error(result.error);
@@ -408,19 +412,19 @@ export default function OnboardingForm({ mode = "onboarding", onSuccess }: Onboa
               </div>
 
               {searchResults.length > 0 && searchQuery.length >= 3 && (
-                <div className="border border-border/50 rounded-2xl overflow-hidden bg-background shadow-xl animate-in fade-in zoom-in-95 duration-200">
+                <div className="border border-border/50 rounded-2xl overflow-hidden bg-background shadow-xl animate-in fade-in zoom-in-95 duration-200 max-w-[320px] mx-auto w-full">
                   <div className="max-h-60 overflow-y-auto no-scrollbar">
                     {searchResults.map((edital) => (
                       <div 
                         key={edital.id}
                         onClick={() => handleSelectPublic(edital)}
-                        className="p-4 hover:bg-primary/5 cursor-pointer border-b border-border/30 last:border-0 flex flex-col gap-1 transition-colors"
+                        className="p-4 hover:bg-primary/5 cursor-pointer border-b border-border/30 last:border-0 flex flex-col gap-1 transition-colors overflow-hidden"
                       >
-                        <div className="text-sm font-bold flex items-center justify-between">
-                          {edital.institution}
-                          <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">{edital.year}</Badge>
+                        <div className="text-sm font-bold flex items-center justify-between gap-2 overflow-hidden">
+                          <span className="truncate flex-1" title={edital.institution}>{edital.institution}</span>
+                          <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 shrink-0">{edital.year}</Badge>
                         </div>
-                        <div className="text-xs text-muted-foreground font-medium">{edital.role}</div>
+                        <div className="text-xs text-muted-foreground font-medium truncate" title={edital.role}>{edital.role}</div>
                       </div>
                     ))}
                   </div>

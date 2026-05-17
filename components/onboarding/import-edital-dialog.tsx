@@ -131,14 +131,14 @@ export function ImportEditalDialog({ benchId, onSuccess, trigger }: ImportEdital
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger render={trigger || defaultTrigger} />
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-[320px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <HugeiconsIcon icon={LibraryIcon} size={20} className="text-primary" />
             Configurar Edital
           </DialogTitle>
           <DialogDescription>
-            Busque na nossa biblioteca ou faça o upload do PDF.
+            Busque ou faça o upload do PDF.
           </DialogDescription>
         </DialogHeader>
 
@@ -152,7 +152,7 @@ export function ImportEditalDialog({ benchId, onSuccess, trigger }: ImportEdital
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" 
               />
               <Input 
-                placeholder="Pesquisar editais (ex: INSS 2024)..." 
+                placeholder="Pesquisar editais..." 
                 className="pl-10 h-10 rounded-xl bg-secondary/10 border-border/50"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -174,11 +174,11 @@ export function ImportEditalDialog({ benchId, onSuccess, trigger }: ImportEdital
                       onClick={() => handleSelectPublic(edital.id)}
                       className="p-3 hover:bg-primary/5 cursor-pointer border-b border-border/30 last:border-0 flex flex-col gap-0.5"
                     >
-                      <div className="text-sm font-bold flex items-center justify-between">
-                        {edital.institution}
-                        <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">{edital.year}</span>
+                      <div className="text-sm font-bold flex items-center justify-between gap-2 overflow-hidden">
+                        <span className="truncate flex-1" title={edital.institution}>{edital.institution}</span>
+                        <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full shrink-0">{edital.year}</span>
                       </div>
-                      <div className="text-xs text-muted-foreground">{edital.role}</div>
+                      <div className="text-[11px] text-muted-foreground truncate" title={edital.role}>{edital.role}</div>
                     </div>
                   ))}
                 </div>

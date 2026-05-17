@@ -144,6 +144,7 @@ export const materials = pgTable("materials", {
 export const publicEditais = pgTable("public_editais", {
   id: uuid("id").primaryKey().defaultRandom(),
   slugName: text("slug_name").unique().notNull(),
+  contestName: text("contest_name"), // Display name
   fileHash: text("file_hash").unique().notNull(),
   institution: text("institution").notNull(),
   role: text("role").notNull(),
