@@ -687,9 +687,14 @@ export async function performWebResearch(
 
     const queryResults = await generateSearchQueries(queryInput);
 
-    // Scrape for each query set
-    for (const querySet of queryResults) {
-      for (const query of querySet.queries) {
+    // Phase: Web Scraping with Parallelism
+    // We process each topic's query sets in parallel to save time
+    await Promise.all(queryResults.map(async (querySet) => {
+      // Process queries for this specific topic
+      // We limit to 2 queries per topic to avoid overwhelming network/quota
+      const limitedQueries = querySet.queries.slice(0, 2);
+      
+      for (const query of limitedQueries) {
         try {
           const scrapedResults = await scrapeSearchResults(
             query,
@@ -697,7 +702,10 @@ export async function performWebResearch(
             targetCount
           );
 
-          for (const scraped of scrapedResults) {
+          // Phase: Process Scraped Results in parallel
+          await Promise.all(scrapedResults.map(async (scraped) => {
+            if (results.length >= targetCount * queryResults.length) return;
+
             let markdown = "";
             let wordCount = 0;
 
@@ -705,33 +713,20 @@ export async function performWebResearch(
               markdown = scraped.markdownContent;
               wordCount = markdown.split(/\s+/).length;
             } else {
-              // Fallback to HTML conversion if markdown is not provided
-              const conversionResult = await htmlToMarkdown(
-                scraped.htmlContent,
-                scraped.title
-              );
-              if (!conversionResult.isValid) continue;
+              const conversionResult = await htmlToMarkdown(scraped.htmlContent, scraped.title);
+              if (!conversionResult.isValid) return;
               markdown = conversionResult.markdown;
               wordCount = conversionResult.wordCount;
             }
 
-            // Calculate authority score
-            const authorityScore = calculateAuthorityScore(
-              scraped.domain,
-              markdown
-            );
+            const authorityScore = calculateAuthorityScore(scraped.domain, markdown);
+            if (authorityScore < 40) return;
 
-            // Filter out low quality or irrelevant results (like editais/news)
-            if (authorityScore < 40) {
-              console.log(`Skipping low authority result (${authorityScore}): ${scraped.sourceUrl}`);
-              continue;
-            }
-
-            // IA BEAUTIFY TITLE: Clean up the title before saving
+            // AI BEAUTIFY TITLE: Parallelized
             const cleanTitle = await beautifyMaterialTitle(scraped.title, querySet.topic);
 
             // Save to web_sources
-            const webSource = await db
+            const [webSource] = await db
               .insert(webSources)
               .values({
                 benchId: bench.id as any,
@@ -746,25 +741,22 @@ export async function performWebResearch(
               })
               .returning();
 
-            results.push({
-              id: webSource[0]?.id,
-              title: cleanTitle,
-              sourceUrl: scraped.sourceUrl,
-              topic: querySet.topic,
-              authorityScore,
-              markdownLength: wordCount,
-            });
-
-            if (results.length >= targetCount * queryResults.length) {
-              break;
+            if (webSource) {
+              results.push({
+                id: webSource.id,
+                title: cleanTitle,
+                sourceUrl: scraped.sourceUrl,
+                topic: querySet.topic,
+                authorityScore,
+                markdownLength: wordCount,
+              });
             }
-          }
+          }));
         } catch (error) {
           console.error(`Erro ao processar query "${query}":`, error);
-          continue;
         }
       }
-    }
+    }));
 
     if (results.length > 0 && session?.user?.id) {
       await createNotification({

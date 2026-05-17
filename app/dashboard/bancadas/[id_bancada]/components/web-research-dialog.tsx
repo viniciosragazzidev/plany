@@ -387,7 +387,7 @@ export function WebResearchDialog({
                               <AccordionTrigger className="hover:no-underline py-0 border-none group">
                                 <div className="flex items-center gap-2 flex-1 text-left min-w-0">
                                   <div className="w-1.5 h-1.5 rounded-full bg-primary/40 group-data-[state=open]:bg-primary transition-colors shrink-0" />
-                                  <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] truncate flex-1" title={category}>{category}</h4>
+                                  <h4 className="text-[10px] py-4 font-black text-muted-foreground uppercase tracking-[0.2em] truncate flex-1" title={category}>{category}</h4>
                                 </div>
                               </AccordionTrigger>
                               <AccordionContent className="pt-2 pb-0 border-none">

@@ -166,26 +166,32 @@ export async function scrapeSearchResults(
     const searchResults = response.data.organic || [];
     const results: ScrapedResult[] = [];
 
-    for (const item of searchResults) {
+    // Filter results first
+    const filteredItems = searchResults.filter((item: any) => {
       const lowerLink = item.link.toLowerCase();
       const lowerTitle = (item.title || "").toLowerCase();
-      
-      const isBlocked = BLOCKED_KEYWORDS.some(kw => 
+      return !BLOCKED_KEYWORDS.some(kw => 
         lowerLink.includes(kw.toLowerCase()) || lowerTitle.includes(kw.toLowerCase())
       );
+    }).slice(0, maxResults * 2); // Get a bit more than needed to account for failures
 
-      if (isBlocked) {
-        console.log(`Skipping blocked result: ${item.link}`);
-        continue;
+    // Scrape in parallel batches
+    const batchSize = 3;
+    for (let i = 0; i < filteredItems.length; i += batchSize) {
+      const batch = filteredItems.slice(i, i + batchSize);
+      const scrapePromises = batch.map((item: any) => scrapeUrl(item.link, topic));
+      const scrapedBatch = await Promise.all(scrapePromises);
+      
+      for (const res of scrapedBatch) {
+        if (res) {
+          results.push({
+            ...res,
+            htmlContent: res.htmlContent || "",
+          });
+        }
+        if (results.length >= maxResults) break;
       }
-
-      const result = await scrapeUrl(item.link, topic);
-      if (result) {
-        results.push({
-            ...result,
-            htmlContent: result.htmlContent || "", // Keep compatibility
-        });
-      }
+      if (results.length >= maxResults) break;
     }
 
     return results;
