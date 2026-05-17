@@ -32,6 +32,7 @@ interface CadernosState {
     setActiveAnotacao: (id: string | null) => void;
     setSearchQuery: (query: string) => void;
     addBenchLocal: (bench: Bench) => void;
+    addSubjectLocal: (benchId: string, subject: Subject) => void;
     addAnotacao: (anotacao: Anotacao) => void;
     updateAnotacaoLocal: (id: string, updates: Partial<Anotacao>) => void;
     replaceAnotacaoId: (oldId: string, newId: string) => void;
@@ -52,6 +53,14 @@ export const useCadernos = create<CadernosState>((set) => ({
     
     addBenchLocal: (bench: Bench) => set((state) => ({
         benches: [...state.benches, bench]
+    })),
+
+    addSubjectLocal: (benchId: string, subject: Subject) => set((state) => ({
+        benches: state.benches.map(b => 
+            b.id === benchId 
+                ? { ...b, subjects: [...b.subjects, subject] } 
+                : b
+        )
     })),
     
     addAnotacao: (anotacao) => set((state) => ({ 

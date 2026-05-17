@@ -1,7 +1,7 @@
 'use client'
 
 import { useCadernos } from "@/hooks/use-cadernos";
-import { Plus, Search, Note01Icon, ArrowDown01Icon, FoldersIcon } from "@hugeicons/core-free-icons";
+import { Plus, Search, Note01Icon, ArrowDown01Icon, FoldersIcon, FolderIcon, Tick01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,15 @@ import { createAnotacao } from "@/lib/actions/cadernos";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { CreateBenchDialog } from "@/components/onboarding/create-bench-dialog";
+import { Label } from "@/components/ui/label";
+import { createSubject } from "@/lib/actions/bench";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export function SidebarCadernos() {
   const { benches, anotacoes, searchQuery, setSearchQuery, activeAnotacaoId, setActiveAnotacao, addAnotacao } = useCadernos();
@@ -107,9 +116,12 @@ export function SidebarCadernos() {
         <div className="space-y-6 pb-20">
           {benches.map(bench => (
             <div key={bench.id} className="space-y-1">
-              <h3 className="px-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest truncate">
-                {bench.goalName}
-              </h3>
+              <div className="flex items-center justify-between px-2 group/bench-header">
+                <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest truncate flex-1" title={bench.goalName}>
+                  {bench.goalName}
+                </h3>
+                <AddSidebarSubjectDialog benchId={bench.id} benchName={bench.goalName} />
+              </div>
               <div className="space-y-1 mt-2">
                 {bench.subjects.map(subject => {
                   const subjectNotes = filteredAnotacoes.filter(a => a.subjectId === subject.id);
@@ -186,5 +198,135 @@ export function SidebarCadernos() {
         </span>
       </div>
     </div>
+  );
+}
+
+const PRESET_COLORS = [
+  "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"
+];
+
+interface AddSidebarSubjectDialogProps {
+  benchId: string;
+  benchName: string;
+}
+
+export function AddSidebarSubjectDialog({ benchId, benchName }: AddSidebarSubjectDialogProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [colorTag, setColorTag] = useState(PRESET_COLORS[0]);
+  const [loading, setLoading] = useState(false);
+
+  const handleCreate = async () => {
+    if (!title) {
+      toast.error("Informe o nome da matéria.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await createSubject({ benchId, title, colorTag });
+      if (res.success) {
+        if (res.data) {
+          // Update local Zustand store
+          const { addSubjectLocal } = useCadernos.getState();
+          addSubjectLocal(benchId, {
+            id: res.data.id,
+            benchId,
+            title: res.data.title,
+            colorTag: res.data.colorTag,
+            icon: res.data.icon
+          });
+          toast.success(`Matéria "${title}" criada com sucesso!`);
+          setIsOpen(false);
+          setTitle("");
+        } else {
+          toast.error("Erro inesperado: dados da matéria não retornados.");
+        }
+      } else {
+        toast.error(res.error || "Erro ao criar matéria.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Erro ao criar matéria.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        className="w-5 h-5 p-0 shrink-0 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded opacity-0 group-hover/bench-header:opacity-100 transition-opacity"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(true);
+        }}
+        title="Criar Matéria / Disciplina"
+      >
+        <HugeiconsIcon icon={Plus} size={10} />
+      </Button>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="sm:max-w-md rounded-2xl" onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm font-bold">
+              <HugeiconsIcon icon={FolderIcon} size={18} className="text-primary" />
+              Nova Matéria para {benchName}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Adicione uma nova matéria para começar a organizar suas anotações nesta bancada.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 py-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="subject-title" className="text-xs font-bold">Nome da Matéria</Label>
+              <Input 
+                id="subject-title" 
+                placeholder="Ex: Direito Administrativo, História..." 
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="h-9 text-xs rounded-xl"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label className="text-xs font-bold">Cor de Destaque</Label>
+              <div className="flex flex-wrap gap-2">
+                {PRESET_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => setColorTag(color)}
+                    className={`size-6 rounded-lg border-2 transition-all ${colorTag === color ? "border-primary scale-110 shadow-md" : "border-transparent"}`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              className="flex-1 text-xs font-bold rounded-xl" 
+              onClick={() => setIsOpen(false)}
+              disabled={loading}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              className="flex-1 gap-2 text-xs font-bold rounded-xl shadow-lg shadow-primary/20" 
+              disabled={!title || loading}
+              onClick={handleCreate}
+            >
+              <HugeiconsIcon icon={Tick01Icon} size={14} />
+              Confirmar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
