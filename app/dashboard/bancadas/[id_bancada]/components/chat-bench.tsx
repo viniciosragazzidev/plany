@@ -267,7 +267,7 @@ export function ChatBench() {
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary mt-1 shadow-sm shadow-primary/5">
               <HugeiconsIcon icon={AiChat01Icon} size={16} className="animate-pulse" />
             </div>
-            <div className="flex-1 space-y-3">
+            <div className="flex-1 space-y-2">
               <div className="flex items-center gap-2 text-[10px] font-bold text-primary uppercase tracking-widest animate-pulse">
                 <span className="flex gap-1">
                   <span className="size-1 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />

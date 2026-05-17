@@ -42,19 +42,36 @@ export interface AIResponse {
  */
 export async function generateAIContent(request: AIRequest): Promise<AIResponse> {
   const localAiUrl = process.env.LOCAL_AI_URL;
-  // gemini-2.5-flash does not exist yet, using 1.5-flash-latest for maximum stability and speed
-  const modelName = request.model === "gemini-2.5-flash" ? "gemini-1.5-flash-latest" : (request.model || "gemini-1.5-flash-latest");
+  // gemini-2.5-flash is the primary stable model for PLANY in 2026
+  const modelName = request.model || "gemini-2.5-flash";
 
   // Check if request requires Cloud (e.g., contains files/PDFs)
   const hasInlineData = request.contents.some(c => c.parts.some(p => p.inlineData));
   const skipLocal = request.forceCloud || hasInlineData;
 
-  // ... (local AI logic remains same)
+  // 1. Tentar Local se disponível
+  if (localAiUrl && !skipLocal) {
+    try {
+      const response = await fetch(`${localAiUrl}/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "llama3",
+          prompt: request.contents[request.contents.length - 1].parts[0].text,
+          stream: false,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.response) return { text: data.response, isLocal: true };
+    } catch (err) {
+      console.warn("[AI-Service] Local AI falhou, tentando Gemini...", err);
+    }
+  }
 
   // 2. Fallback to Gemini
-  // Reduced list to prevent Vercel 504 Timeouts. 
-  // Most errors are transient or configuration-based, trying too many models just burns time.
-  const models = [modelName, "gemini-1.5-flash-latest"];
+  // Priorizando Gemini 2.5 Flash conforme arquitetura de performance do PLANY
+  const models = [modelName, "gemini-2.5-flash", "gemini-2.5-pro"];
   let lastError: any;
 
   // Use unique models only
@@ -77,9 +94,9 @@ export async function generateAIContent(request: AIRequest): Promise<AIResponse>
       const duration = Date.now() - startTime;
       console.warn(`[AI-Service] Modelo ${mName} falhou após ${duration}ms:`, err.message);
       
-      // If we are nearing the 30s Vercel limit, abort and throw
+      // If the model is not found, continue to the next fallback
       if (err.status === 404 || err.message?.toLowerCase().includes("not found")) {
-        continue; // Try next model if current one doesn't exist
+        continue;
       }
       
       // For other errors (like safety blocks or permanent failures), don't loop
@@ -94,11 +111,24 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
   const localAiUrl = process.env.LOCAL_AI_URL;
 
   if (localAiUrl) {
-    // ... (local embedding logic remains same)
+    try {
+      const response = await fetch(`${localAiUrl}/api/embeddings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "all-minilm",
+          prompt: text,
+        }),
+      });
+      const data = await response.json();
+      if (data.embedding) return data.embedding;
+    } catch (err) {
+      console.warn("[AI-Service] Local Embedding falhou, tentando Cloud...", err);
+    }
   }
 
-  // text-embedding-004 is the current stable state-of-the-art embedding model
-  const models = ["text-embedding-004"];
+  // gemini-embedding-2 is the current state-of-the-art embedding model in 2026
+  const models = ["gemini-embedding-2", "gemini-embedding-001"];
   
   for (const modelName of models) {
     try {
@@ -112,8 +142,14 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
       }
     } catch (error: any) {
       console.warn(`[AI-Service] Embedding com ${modelName} falhou:`, error.message);
-      // Don't loop on embeddings to save time for the main generation
-      break;
+      
+      // If the model is not found, try the next one
+      if (error.status === 404 || error.message?.toLowerCase().includes("not found")) {
+        continue;
+      }
+      
+      // For other errors, return null
+      return null;
     }
   }
   

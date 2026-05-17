@@ -53,7 +53,7 @@ Sua resposta deve ser estritamente um JSON válido:
 
   try {
     const response = await generateAIContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: [{ 
         role: "user", 
         parts: [{ text: `CONTEÚDO DO EDITAL:\n\n${editalContent.substring(0, 15000)}` }] 
@@ -74,7 +74,7 @@ Sua resposta deve ser estritamente um JSON válido:
 export async function beautifyMaterialTitle(rawTitle: string, topic: string): Promise<string> {
   try {
     const response = await generateAIContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: [{ 
         role: "user", 
         parts: [{ text: `O tópico de estudo é: "${topic}"
@@ -133,7 +133,7 @@ Gere queries Google Dorks cirúrgicas para encontrar materiais didáticos em Por
 
   try {
     const response = await generateAIContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
       config: {
         systemInstruction: { parts: [{ text: systemPrompt }] },

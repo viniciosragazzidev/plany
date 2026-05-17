@@ -37,6 +37,10 @@ export async function POST(req: NextRequest) {
     } = await req.json();
 
     const lastUserMessage = messages.filter((m) => m.role === "user").pop()?.content || "";
+    
+    // OTIMIZAÇÃO 1: Limitar o histórico da conversa para os últimos 6 turnos (3 interações completas)
+    // Isso evita o inchaço exponencial do payload de rede e do tempo de processamento da IA
+    const recentMessages = messages.slice(-6);
 
     // 1. Semantic Cache Check (Graceful)
     let queryEmbedding: number[] | null = null;
@@ -76,10 +80,50 @@ export async function POST(req: NextRequest) {
     let systemPrompt = "";
 
     if (isEditalConsultantMode) {
-      const editalContent = bench.examNotice || bench.examNoticeRaw || "Conteúdo do edital não disponível.";
+      // OTIMIZAÇÃO 2: RAG Direcionado para o Consultor de Edital
+      // Evita injetar um edital de 100k caracteres a cada pergunta, o que causa latência extrema.
+      let editalContext = "";
+      try {
+        if (!queryEmbedding) queryEmbedding = await getEmbedding(lastUserMessage);
+        
+        if (queryEmbedding) {
+          const relevantChunks = await db
+            .select({
+              content: materialChunks.content,
+              similarity: sql<number>`1 - (${materialChunks.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector)`
+            })
+            .from(materialChunks)
+            .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+            .where(
+              and(
+                eq(materials.benchId, benchId),
+                eq(materials.title, "Edital Oficial") // Filtra apenas chunks do edital
+              )
+            )
+            .orderBy(t => desc(t.similarity))
+            .limit(10); // Traz os 10 trechos mais relevantes do edital
+
+          editalContext = relevantChunks.map(c => c.content).join("\n\n---\n\n");
+        }
+      } catch (e) {
+        console.warn("[Chat] Falha ao recuperar contexto do edital via RAG", e);
+      }
+
+      // Fallback seguro: se RAG falhar ou estiver vazio, pega o início do edital, mas truncado.
+      const fallbackContent = bench.examNotice || bench.examNoticeRaw || "Conteúdo do edital não disponível.";
+      const finalEditalContent = editalContext || fallbackContent.substring(0, 15000);
+
       systemPrompt = `Você é o CONSULTOR DE EDITAL da plataforma PLANY.
-Responda APENAS com base no edital: ${bench.goalName}.
-Fonte: ${editalContent}`;
+Sua missão é responder dúvidas do usuário ESTRITAMENTE com base nas informações oficiais do concurso: ${bench.goalName}.
+
+### TRECHOS RECUPERADOS DO EDITAL:
+${finalEditalContent}
+
+DIRETRIZES:
+1. Responda de forma clara, direta e objetiva.
+2. Se a informação não estiver presente nos trechos acima, diga: "Não encontrei essa informação específica nas seções do edital que analisei."
+3. Não invente datas, regras ou matérias.`;
+
     } else {
       let contextMaterials = "";
       try {
@@ -158,7 +202,7 @@ Idioma: Português do Brasil.`;
     try {
       const aiResponse = await generateAIContent({
         model: "gemini-2.5-flash",
-        contents: messages.map((m) => ({
+        contents: recentMessages.map((m) => ({
           role: m.role === "assistant" ? "model" : m.role,
           parts: [{ text: m.content }],
         })) as any,
