@@ -39,6 +39,16 @@ const BLOCKED_KEYWORDS = [
   "folha dirigida",
   "gran cursos",
   "estratégia concursos",
+  "conteúdo programático",
+  "conteudo programatico",
+  "ementa",
+  "currículo",
+  "curriculo",
+  "bimestre",
+  "plano de ensino",
+  "plano de curso",
+  "grade curricular",
+  "matriz curricular",
 ];
 
 const SERPER_API_KEY = process.env.SERPER_API_KEY;
@@ -67,6 +77,32 @@ export function calculateAuthorityScore(domain: string, content: string): number
   });
 
   if (editalCount >= 3) score -= 30;
+
+  // Penalize syllabus / curriculum matrices / course structures (which are not study materials)
+  const syllabusKeywords = ["conteúdo programático", "conteudo programatico", "ementa", "currículo", "curriculo", "plano de curso", "plano de ensino", "grade curricular", "matriz curricular", "1º bimestre", "2º bimestre", "3º bimestre", "4º bimestre", "plano de aula"];
+  let syllabusCount = 0;
+  syllabusKeywords.forEach(kw => {
+    if (lowerContent.includes(kw)) syllabusCount++;
+  });
+
+  if (syllabusCount >= 2) {
+    score -= 40; // Dramatically lower authority for syllabus/course outlines
+  }
+
+  // Reject completely if it is a structural curriculum matrix or index with low actual explanation
+  if (
+    lowerContent.includes("conteúdo programático") || 
+    lowerContent.includes("conteudo programatico") || 
+    lowerContent.includes("grade curricular") || 
+    lowerContent.includes("matriz curricular") ||
+    lowerContent.includes("bimestre")
+  ) {
+    const lines = content.split(/\n/).length;
+    const sentences = (content.match(/\. /g) || []).length;
+    if (lines > 15 && sentences < 8) {
+      return 1; // Minimum score to discard instantly
+    }
+  }
   
   // Detect if it's just a list (low text-to-bullet ratio)
   // This often identifies editais that just list subjects

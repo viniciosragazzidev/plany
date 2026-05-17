@@ -106,16 +106,17 @@ REGRAS DE ISOLAMENTO POR MATÉRIA:
    - Jamais permita que termos de Matemática (juros, porcentagem, equações) vazem para uma busca de Português, mesmo que o tópico pareça genérico.
    - Use palavras de reforço da disciplina (ex: "em português", "gramática", "teoria da língua").
 
-2. EXCLUSÃO DE RUÍDO: Evite ABSOLUTAMENTE resultados irrelevantes como:
+2. EXCLUSÃO DE RUÍDO (CRÍTICO): Evite ABSOLUTAMENTE resultados irrelevantes como:
    - Editais de concursos (listas de matérias sem explicação)
+   - Ementas escolares, matrizes curriculares, grades de curso, programas ou cronogramas de aula estruturais (ex: páginas que apenas listam o que será estudado por 1º Bimestre, 2º Bimestre, Série, etc., sem explicar o conteúdo real).
    - Páginas de inscrição ou notícias de certames
    - Cronogramas ou tabelas de vagas
    - Sites de notícias de concursos (ex: PCI Concursos, Folha Dirigida, Gran Cursos, Estratégia)
 
-3. MODELOS DE DORKS (Gere 3 por tópico):
-   1. filetype:pdf "[MATÉRIA]" "[TÓPICO]" (resumo OR apostila OR teoria) -edital -concurso -inscrição -cronograma -pci -gran -estratégia
-   2. site:.edu.br "[MATÉRIA]" "[TÓPICO]" (aula OR "notas de aula" OR tutorial OR explicativo) -vaga -resultado
-   3. site:.gov.br "[MATÉRIA]" "[TÓPICO]" (manual OR guia OR "entenda o" OR "sobre o") -cronograma -gabarito
+3. MODELOS DE DORKS EXCLUSIVOS (Gere 3 por tópico contendo exclusões obrigatórias):
+   1. filetype:pdf "[MATÉRIA]" "[TÓPICO]" (resumo OR apostila OR teoria) -edital -concurso -inscrição -cronograma -pci -gran -estratégia -ementa -currículo -curriculo -"conteúdo programático" -"conteudo programatico" -bimestre
+   2. site:.edu.br "[MATÉRIA]" "[TÓPICO]" (aula OR "notas de aula" OR tutorial OR explicativo) -vaga -resultado -ementa -currículo -curriculo -"conteúdo programático" -"conteudo programatico" -bimestre
+   3. site:.gov.br "[MATÉRIA]" "[TÓPICO]" (manual OR guia OR "entenda o" OR "sobre o") -cronograma -gabarito -ementa -currículo -curriculo -"conteúdo programático" -"conteudo programatico" -bimestre
 
 Retorne APENAS um JSON válido no seguinte formato:
 {
