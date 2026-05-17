@@ -69,19 +69,7 @@ export function IntelligenceTools({
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [isLoadingQuizzes, setIsLoadingQuizzes] = useState(false);
   
-  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
-
-  const materialsBySubject = useMemo(() => {
-    const map: Record<string, any[]> = {};
-    if (!materials) return map;
-    materials.forEach(m => {
-      const subject = subjects.find(s => s.id === m.subjectId);
-      const key = subject?.title || "Geral";
-      if (!map[key]) map[key] = [];
-      map[key].push(m);
-    });
-    return map;
-  }, [materials, subjects]);
+  const [selectedEditalItems, setSelectedEditalItems] = useState<string[]>([]);
 
   const daysLeft = differenceInDays(new Date(targetDate), new Date());
   const totalCount = editalItems.length;
@@ -126,16 +114,26 @@ export function IntelligenceTools({
   }, [sidebarState, benchId, isGeneratingQuiz]);
 
   const handleGenerateQuiz = async () => {
-    if (!selectedMaterialId) {
-      toast.error("Selecione um material.");
+    if (selectedEditalItems.length === 0) {
+      toast.error("Selecione pelo menos um assunto.");
       return;
     }
 
-    const matchedMaterial = materials.find(m => m.id === selectedMaterialId);
-    const subjectId = matchedMaterial?.subjectId || (subjects.length > 0 ? subjects[0].id : "");
+    // Identify subjectId from selected edital items
+    const firstItemId = selectedEditalItems[0];
+    const firstItem = editalItems.find(item => item.id === firstItemId);
+    
+    if (!firstItem) return;
+
+    const matchedSubject = subjects.find(s => 
+      s.title.toLowerCase() === firstItem.category.toLowerCase() ||
+      firstItem.category.toLowerCase().includes(s.title.toLowerCase())
+    );
+
+    const subjectId = matchedSubject?.id || (subjects.length > 0 ? subjects[0].id : "");
 
     if (!subjectId) {
-      toast.error("Nenhuma matéria encontrada vinculada a este material.");
+      toast.error("Nenhuma matéria encontrada vinculada a este assunto.");
       return;
     }
 
@@ -144,11 +142,11 @@ export function IntelligenceTools({
     toast.info("Gerando seu quiz personalizado... 🧠");
     
     try {
-      const res = await generateQuizAction(benchId, subjectId, [], selectedMaterialId);
+      const res = await generateQuizAction(benchId, subjectId, selectedEditalItems);
       
       if (res.success) {
         toast.success("Quiz gerado com sucesso!");
-        setSelectedMaterialId(null);
+        setSelectedEditalItems([]);
         await loadQuizzes();
       } else {
         toast.error(res.error || "Erro ao gerar quiz");
@@ -369,40 +367,38 @@ export function IntelligenceTools({
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
-               {/* Simplified Quiz Config List */}
+               {/* Quiz Config List */}
                <div className="space-y-4">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Selecione 1 Material Base</p>
-                  {materials.length > 0 ? Object.entries(materialsBySubject).map(([subject, mats]) => (
-                    <div key={subject} className="space-y-2 min-w-0">
-                       <h5 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest truncate">{subject}</h5>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Selecione os Tópicos</p>
+                  {categories.map(cat => (
+                    <div key={cat} className="space-y-2 min-w-0">
+                       <h5 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest truncate" title={cat}>{cat}</h5>
                        <div className="space-y-1.5 pl-2 border-l-2 border-primary/10">
-                          {mats.map(m => (
-                            <div key={m.id} className="flex items-center gap-2 min-w-0">
+                          {editalItems.filter(i => i.category === cat).map(item => (
+                            <div key={item.id} className="flex items-center gap-2 min-w-0">
                                <Checkbox 
-                                 id={m.id} 
-                                 checked={selectedMaterialId === m.id} 
-                                 onCheckedChange={(checked) => checked ? setSelectedMaterialId(m.id) : setSelectedMaterialId(null)} 
+                                 id={item.id} 
+                                 checked={selectedEditalItems.includes(item.id)} 
+                                 onCheckedChange={(checked) => checked ? setSelectedEditalItems(prev => [...prev, item.id]) : setSelectedEditalItems(prev => prev.filter(id => id !== item.id))} 
                                />
                                <Label 
-                                  htmlFor={m.id} 
+                                  htmlFor={item.id} 
                                   className="text-[11px] font-medium leading-tight truncate flex-1 cursor-pointer"
-                                  title={m.title}
+                                  title={item.topic}
                                 >
-                                  {m.title}
+                                  {item.topic}
                                 </Label>
                             </div>
                           ))}
                        </div>
                     </div>
-                  )) : (
-                    <p className="text-xs text-muted-foreground">Nenhum material cadastrado nesta bancada.</p>
-                  )}
+                  ))}
                </div>
                <div className="pt-4 border-t border-border/50">
                   <Button 
                     className="w-full h-12 rounded-2xl gap-2 font-black uppercase text-xs bg-primary text-white shadow-lg shadow-primary/20" 
                     onClick={handleGenerateQuiz} 
-                    disabled={!selectedMaterialId}
+                    disabled={selectedEditalItems.length === 0}
                   >
                      <HugeiconsIcon icon={SparklesIcon} size={18} />
                      Gerar 10 Questões

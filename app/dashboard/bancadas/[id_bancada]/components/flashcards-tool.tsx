@@ -100,11 +100,11 @@ export function FlashcardsTool({ benchId, subjects, materials = [] }: Flashcards
     setIsLoading(false);
   };
 
-  const handleGenerate = async (subjectId: string, materialId: string) => {
+  const handleGenerate = async (subjectId: string) => {
     setIsGeneratingFlashcards(true);
 
     try {
-      const res = await generateFlashcardsAction(benchId, subjectId, materialId);
+      const res = await generateFlashcardsAction(benchId, subjectId);
       if (res.success) {
         toast.success(`Criamos ${res.count} flashcards de elite para você!`);
         loadStats();
@@ -188,41 +188,24 @@ export function FlashcardsTool({ benchId, subjects, materials = [] }: Flashcards
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar">
-          {materials && materials.length > 0 ? (
-            <div className="space-y-4">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Escolha 1 Material (Base)</p>
-              {Object.entries(materialsBySubject).map(([subject, mats]) => (
-                <div key={subject} className="space-y-2">
-                  <h5 className="text-[11px] font-bold text-foreground/70 flex items-center gap-2">
-                    <div className="w-1 h-3 bg-amber-500 rounded-full" />
-                    {subject}
-                  </h5>
-                  <div className="space-y-2 pl-2">
-                    {mats.map(m => (
-                      <Card
-                        key={m.id}
-                        className="p-3 rounded-xl border-border/50 hover:border-amber-500/50 transition-all cursor-pointer bg-background flex items-center justify-between group"
-                        onClick={() => {
-                          const subj = subjects.find(s => s.title === subject);
-                          handleGenerate(subj?.id || (subjects.length > 0 ? subjects[0].id : ""), m.id);
-                        }}
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <div className="w-6 h-6 shrink-0 rounded-md flex items-center justify-center text-amber-500 bg-amber-500/5 group-hover:bg-amber-500/10 transition-colors">
-                            <HugeiconsIcon icon={Book01Icon} size={14} />
-                          </div>
-                          <span className="text-xs font-medium truncate">{m.title}</span>
-                        </div>
-                        <HugeiconsIcon icon={SparklesIcon} size={14} className="text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2" />
-                      </Card>
-                    ))}
-                  </div>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Escolha uma Disciplina</p>
+          <div className="space-y-2">
+            {subjects.map((s) => (
+              <div
+                key={s.id}
+                className="p-3 rounded-xl border border-border/50 bg-background flex items-center justify-between hover:border-amber-500/50 transition-all cursor-pointer group"
+                onClick={() => handleGenerate(s.id)}
+              >
+                <div className="flex items-center gap-2 truncate">
+                   <div className="w-6 h-6 shrink-0 rounded-md flex items-center justify-center text-amber-500 bg-amber-500/5 group-hover:bg-amber-500/10 transition-colors">
+                      <HugeiconsIcon icon={Book01Icon} size={14} />
+                   </div>
+                   <span className="text-xs font-bold truncate">{s.title}</span>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground text-center mt-10">Nenhum material encontrado.</p>
-          )}
+                <HugeiconsIcon icon={SparklesIcon} size={14} className="text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );

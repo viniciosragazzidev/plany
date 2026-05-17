@@ -19,7 +19,6 @@ import { getEmbedding } from "@/lib/services/ai/ai-optimizations";
 export async function generateFlashcardsAction(
   benchId: string, 
   subjectId: string, 
-  materialId?: string,
   topicText?: string
 ) {
   try {
@@ -40,12 +39,7 @@ export async function generateFlashcardsAction(
         })
         .from(materialChunks)
         .innerJoin(materials, eq(materialChunks.materialId, materials.id))
-        .where(
-          and(
-            eq(materials.benchId, benchId),
-            materialId ? eq(materials.id, materialId) : undefined
-          )
-        )
+        .where(eq(materials.benchId, benchId))
         .orderBy(t => desc(sql`1 - (${materialChunks.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector)`))
         .limit(10);
 
@@ -61,8 +55,7 @@ export async function generateFlashcardsAction(
         .where(
           and(
             eq(materials.benchId, benchId),
-            subjectId ? eq(materials.subjectId, subjectId) : undefined,
-            materialId ? eq(materials.id, materialId) : undefined
+            subjectId ? eq(materials.subjectId, subjectId) : undefined
           )
         )
         .limit(3);

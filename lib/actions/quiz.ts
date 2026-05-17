@@ -19,8 +19,7 @@ import { getEmbedding } from "@/lib/services/ai/ai-optimizations";
 export async function generateQuizAction(
   benchId: string, 
   subjectId: string, 
-  selectedEditalItemIds: string[],
-  materialId?: string
+  selectedEditalItemIds: string[]
 ) {
   try {
     // 1. Get Context: Using Surgical RAG
@@ -48,11 +47,9 @@ export async function generateQuizAction(
         .where(
           and(
             eq(materials.benchId, benchId),
-            materialId ? eq(materials.id, materialId) : (
-              selectedEditalItemIds.length > 0 
-                ? inArray(materials.editalItemId, selectedEditalItemIds)
-                : eq(materials.subjectId, subjectId)
-            )
+            selectedEditalItemIds.length > 0 
+              ? inArray(materials.editalItemId, selectedEditalItemIds)
+              : eq(materials.subjectId, subjectId)
           )
         )
         .orderBy(t => desc(sql`1 - (${materialChunks.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector)`))
@@ -68,11 +65,9 @@ export async function generateQuizAction(
         .where(
           and(
             eq(materials.benchId, benchId),
-            materialId ? eq(materials.id, materialId) : (
-              selectedEditalItemIds.length > 0 
-                ? inArray(materials.editalItemId, selectedEditalItemIds)
-                : eq(materials.subjectId, subjectId)
-            )
+            selectedEditalItemIds.length > 0 
+              ? inArray(materials.editalItemId, selectedEditalItemIds)
+              : eq(materials.subjectId, subjectId)
           )
         )
         .limit(15);
