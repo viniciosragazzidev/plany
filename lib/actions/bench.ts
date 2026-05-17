@@ -14,17 +14,17 @@ import { createNotification } from "./notifications";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { extractStructuredText } from "@/lib/pdf-extractor";
-import { 
-  analyzeEditalMetadata, 
-  checkExistingEdital, 
-  selectPublicEdital, 
-  parseAndIndexEdital 
+import {
+  analyzeEditalMetadata,
+  checkExistingEdital,
+  selectPublicEdital,
+  parseAndIndexEdital
 } from "./public-edital";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import { tokenizer } from "../services/infrastructure";
 
-import { tokenizer } from "@/lib/services/ai/text-processor";
 
 export async function processEditalPDF(formData: FormData): Promise<ActionResponse<{ topicCount: number }>> {
   const file = formData.get("file") as File;
@@ -39,7 +39,7 @@ export async function processEditalPDF(formData: FormData): Promise<ActionRespon
     const t0 = Date.now();
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    
+
     // Calculate File Hash for deduplication
     const fileHash = crypto.createHash('md5').update(buffer).digest('hex');
 
@@ -50,17 +50,17 @@ export async function processEditalPDF(formData: FormData): Promise<ActionRespon
     console.log("[processEditalPDF] Tokenizando texto...");
     const chunks = await tokenizer(structuredText);
     console.log(`[processEditalPDF] Texto fatiado em ${chunks.length} blocos.`);
-    
+
     // DEBUG: Write to file at root
     try {
       const debugFilePath = path.join(process.cwd(), "debug_tokenized_text.txt");
-      const debugContent = chunks.map((c, i) => `--- BLOCk ${i+1} (${c.estimatedTokens} tokens) ---\n${c.content}\n`).join("\n\n");
+      const debugContent = chunks.map((c, i) => `--- BLOCk ${i + 1} (${c.estimatedTokens} tokens) ---\n${c.content}\n`).join("\n\n");
       fs.writeFileSync(debugFilePath, debugContent);
       console.log(`[processEditalPDF] DEBUG: Texto tokenizado salvo em ${debugFilePath}`);
     } catch (debugErr) {
       console.error("[processEditalPDF] Falha ao salvar arquivo de debug:", debugErr);
     }
-    
+
     // Use the first chunk (header) for metadata extraction - it's usually enough and faster
     const headerContext = chunks[0]?.content || structuredText.substring(0, 8000);
 
@@ -80,7 +80,7 @@ export async function processEditalPDF(formData: FormData): Promise<ActionRespon
       console.log("[processEditalPDF] Cache Hit! Vinculando edital existente...");
       const selectRes = await selectPublicEdital(benchId, existingId);
       if (!selectRes.success) throw new Error(selectRes.error);
-      
+
       return actionSuccess({ topicCount: 0 }, "Edital encontrado na biblioteca e vinculado com sucesso!");
     }
 
@@ -112,7 +112,7 @@ export async function extractBenchDataFromEdital(formData: FormData) {
     const t0 = Date.now();
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    
+
     // Calculate File Hash for deduplication
     const fileHash = crypto.createHash('md5').update(buffer).digest('hex');
 
@@ -129,13 +129,13 @@ export async function extractBenchDataFromEdital(formData: FormData) {
     // DEBUG: Write to file at root
     try {
       const debugFilePath = path.join(process.cwd(), "debug_tokenized_text_onboarding.txt");
-      const debugContent = chunks.map((c, i) => `--- BLOCk ${i+1} (${c.estimatedTokens} tokens) ---\n${c.content}\n`).join("\n\n");
+      const debugContent = chunks.map((c, i) => `--- BLOCk ${i + 1} (${c.estimatedTokens} tokens) ---\n${c.content}\n`).join("\n\n");
       fs.writeFileSync(debugFilePath, debugContent);
       console.log(`[extractBenchDataFromEdital] DEBUG: Texto tokenizado salvo em ${debugFilePath}`);
     } catch (debugErr) {
       console.error("[extractBenchDataFromEdital] Falha ao salvar arquivo de debug:", debugErr);
     }
-    
+
     // Use the first chunk (header) for metadata extraction - it's usually enough and faster
     const headerContext = chunks[0]?.content || structuredText.substring(0, 8000);
 
@@ -205,11 +205,11 @@ export async function extractBenchDataFromEdital(formData: FormData) {
 
     const response = await generateAIContent({
       model: "gemini-2.5-flash",
-      contents: [{ 
-        role: "user", 
+      contents: [{
+        role: "user",
         parts: [
           { text: `TEXTO DO EDITAL:\n\n${structuredText.substring(0, 100000)}` }
-        ] 
+        ]
       }],
       forceCloud: true,
       config: {
@@ -220,13 +220,13 @@ export async function extractBenchDataFromEdital(formData: FormData) {
 
     const text = response.text;
     if (!text) throw new Error("A IA não retornou uma resposta válida.");
-    
+
     const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
     const parsedData = JSON.parse(jsonStr);
 
     console.log(`[extractBenchDataFromEdital] Tempo TOTAL: ${Date.now() - t0}ms`);
-    return { 
-      success: true, 
+    return {
+      success: true,
       data: {
         publicEditalId: null,
         goalName: metadata.contestName || `${metadata.institution} - ${metadata.role}`,
@@ -239,7 +239,7 @@ export async function extractBenchDataFromEdital(formData: FormData) {
         // Carry forward metadata for final indexing
         rawMetadata: metadata,
         fileHash
-      } 
+      }
     };
   } catch (error: any) {
     console.error("Erro ao extrair dados do Edital:", error);
@@ -311,11 +311,11 @@ export async function addMaterial(formData: FormData): Promise<ActionResponse<{ 
 
       const mdResponse = await generateAIContent({
         model: "gemini-2.5-flash",
-        contents: [{ 
-          role: "user", 
+        contents: [{
+          role: "user",
           parts: [
             { text: `TEXTO ESTRUTURADO PARA CONVERTER:\n\n${structuredText.substring(0, 100000)}` }
-          ] 
+          ]
         }],
         forceCloud: true,
         config: {
@@ -329,13 +329,13 @@ export async function addMaterial(formData: FormData): Promise<ActionResponse<{ 
         const jsonStr = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
         const parsed = JSON.parse(jsonStr);
         content = parsed.content || "";
-        
+
         // If subjectId wasn't provided, try to find the suggested one
         if (!subjectId && parsed.suggestedSubject) {
-            const matched = existingSubjects.find(s => s.title.toLowerCase() === parsed.suggestedSubject.toLowerCase());
-            if (matched) {
-                subjectId = matched.id;
-            }
+          const matched = existingSubjects.find(s => s.title.toLowerCase() === parsed.suggestedSubject.toLowerCase());
+          if (matched) {
+            subjectId = matched.id;
+          }
         }
       } catch (e) {
         content = resultText;
@@ -357,7 +357,7 @@ export async function addMaterial(formData: FormData): Promise<ActionResponse<{ 
     if (content && content.trim().length > 0) {
       const { chunkMarkdown, getEmbedding, classifyChunk } = await import("@/lib/ai-optimizations");
       const chunks = chunkMarkdown(content);
-      
+
       for (const chunk of chunks) {
         try {
           const [embedding, originTag] = await Promise.all([
@@ -397,7 +397,7 @@ export async function deleteTopic(topicId: string) {
       .returning();
 
     if (item) {
-        revalidatePath(`/dashboard/bancadas/${item.benchId}`);
+      revalidatePath(`/dashboard/bancadas/${item.benchId}`);
     }
     return { success: true };
   } catch (error: any) {
@@ -460,15 +460,15 @@ export async function updateSubject(subjectId: string, data: { title?: string; c
 }
 
 export async function getContextualNotes(
-  subjectId: string, 
-  topicId: string | null, 
+  subjectId: string,
+  topicId: string | null,
   query: string,
   limit: number = 5
 ) {
   try {
     const { getEmbedding } = await import("@/lib/ai-optimizations");
     const queryEmbedding = await getEmbedding(query);
-    
+
     if (!queryEmbedding) return { success: false, chunks: [] };
 
     const similarity = sql<number>`1 - (${materialChunks.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector)`;
@@ -602,12 +602,12 @@ export async function performWebResearch(
     // ... (session check)
     let session;
     try {
-        const currentHeaders = await headers();
-        session = await auth.api.getSession({
-            headers: currentHeaders,
-        });
+      const currentHeaders = await headers();
+      session = await auth.api.getSession({
+        headers: currentHeaders,
+      });
     } catch (authError) {
-        console.warn("[Auth] Falha ao recuperar sessão via headers:", authError);
+      console.warn("[Auth] Falha ao recuperar sessão via headers:", authError);
     }
 
     // Fetch bench and edital content
@@ -623,7 +623,7 @@ export async function performWebResearch(
     await db.update(studyBenches)
       .set({ researchStatus: "researching" })
       .where(eq(studyBenches.id, benchId));
-    
+
     // Get topics from edital strictly filtered by selected subjects or specificTopics
     let topics: string[] = [];
 
@@ -633,7 +633,7 @@ export async function performWebResearch(
     } else if (selectedSubjectIds && selectedSubjectIds.length > 0) {
       // 1. Fetch the titles of the selected subjects
       const selectedSubjects = await db.query.subjects.findMany({
-        where: (subjects, { and, eq, inArray }) => 
+        where: (subjects, { and, eq, inArray }) =>
           and(
             eq(subjects.benchId, benchId),
             inArray(subjects.id, selectedSubjectIds)
@@ -648,9 +648,9 @@ export async function performWebResearch(
       });
 
       // 3. Filter edital items that match the selected subject categories
-      const filteredEditalItems = editalItemsList.filter(item => 
-        subjectTitles.some(title => 
-          item.category.toLowerCase().includes(title) || 
+      const filteredEditalItems = editalItemsList.filter(item =>
+        subjectTitles.some(title =>
+          item.category.toLowerCase().includes(title) ||
           title.includes(item.category.toLowerCase())
         )
       );
@@ -784,7 +784,7 @@ export async function performWebResearch(
     };
   } catch (error: any) {
     console.error("Erro na pesquisa web:", error);
-    
+
     await db.update(studyBenches)
       .set({ researchStatus: "idle" })
       .where(eq(studyBenches.id, benchId));
@@ -801,7 +801,7 @@ export async function importWebMaterials(webSourceIds: string[]) {
   try {
     // Fetch specifically requested web sources that are converted
     const sourcesToImport = await db.query.webSources.findMany({
-      where: (ws, { and, inArray, eq }) => 
+      where: (ws, { and, inArray, eq }) =>
         and(
           inArray(ws.id, webSourceIds),
           eq(ws.status, "converted")
@@ -839,28 +839,28 @@ export async function importWebMaterials(webSourceIds: string[]) {
         const matchedItem = benchEditalItems.find(item => {
           const itemCat = item.category.toLowerCase().trim();
           const itemTop = item.topic.toLowerCase().trim();
-          
+
           // Strict match: Category and Topic must align with what was searched
           return (itemCat === categoryPart && itemTop === topicPart) ||
-                 (itemTop === topicPart);
+            (itemTop === topicPart);
         });
 
         if (matchedItem) {
           editalItemId = matchedItem.id;
-          
+
           // 2. Map subject from matched edital item category
           // Exact match is safer than .includes() to avoid 'Matematica' matching 'Matematica Financeira'
-          const matchedSubject = benchSubjects.find(s => 
+          const matchedSubject = benchSubjects.find(s =>
             s.title.toLowerCase().trim() === matchedItem.category.toLowerCase().trim()
           );
-          
+
           if (matchedSubject) {
             subjectId = matchedSubject.id;
           } else {
             // Partial match fallback only if very similar
-            const partialMatch = benchSubjects.find(s => 
-                matchedItem.category.toLowerCase().includes(s.title.toLowerCase()) &&
-                (matchedItem.category.length - s.title.length < 5) // Strict threshold
+            const partialMatch = benchSubjects.find(s =>
+              matchedItem.category.toLowerCase().includes(s.title.toLowerCase()) &&
+              (matchedItem.category.length - s.title.length < 5) // Strict threshold
             );
             if (partialMatch) subjectId = partialMatch.id;
           }
@@ -868,11 +868,11 @@ export async function importWebMaterials(webSourceIds: string[]) {
 
         // 3. Fallback: Try to match subject directly from source topic or category if not found
         if (!subjectId) {
-          const matchedSubject = benchSubjects.find(s => 
+          const matchedSubject = benchSubjects.find(s =>
             s.title.toLowerCase().trim() === categoryPart ||
             (categoryPart.includes(s.title.toLowerCase()) && (categoryPart.length - s.title.length < 5))
           );
-          
+
           if (matchedSubject) {
             subjectId = matchedSubject.id;
           }

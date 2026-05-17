@@ -38,10 +38,6 @@ export function QuizActiveState({ quizId, onBack }: QuizActiveStateProps) {
   const [isFinished, setIsFinished] = useState(false);
   const [score, setScore] = useState<number | null>(null);
 
-  useEffect(() => {
-    loadQuiz();
-  }, [quizId]);
-
   const loadQuiz = async () => {
     const res = await getQuizDetailsAction(quizId);
     if (res.success) {
@@ -51,6 +47,10 @@ export function QuizActiveState({ quizId, onBack }: QuizActiveStateProps) {
       onBack();
     }
   };
+
+  useEffect(() => {
+    loadQuiz();
+  }, [quizId]);
 
   const handleAnswer = async () => {
     if (!selectedOptionId || !confidenceLevel) return;

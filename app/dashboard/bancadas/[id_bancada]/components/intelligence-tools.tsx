@@ -76,6 +76,22 @@ export function IntelligenceTools({
   const coveredCount = editalItems.filter(item => item.isCovered).length;
   const coveragePercent = totalCount > 0 ? Math.round((coveredCount / totalCount) * 100) : 0;
 
+  const loadQuizzes = async () => {
+    if (isLoadingQuizzes) return;
+    setIsLoadingQuizzes(true);
+    try {
+      const res = await getQuizzesAction(benchId);
+      if (res.success && res.quizzes) {
+        console.log(`[IntelligenceTools] Successfully loaded ${res.quizzes.length} quizzes`);
+        setQuizzes(res.quizzes);
+      }
+    } catch (e) {
+      console.error("[IntelligenceTools] Failed to load quizzes:", e);
+    } finally {
+      setIsLoadingQuizzes(false);
+    }
+  };
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
@@ -96,22 +112,6 @@ export function IntelligenceTools({
       if (interval) clearInterval(interval);
     };
   }, [sidebarState, benchId, isGeneratingQuiz]);
-
-  const loadQuizzes = async () => {
-    if (isLoadingQuizzes) return;
-    setIsLoadingQuizzes(true);
-    try {
-      const res = await getQuizzesAction(benchId);
-      if (res.success && res.quizzes) {
-        console.log(`[IntelligenceTools] Successfully loaded ${res.quizzes.length} quizzes`);
-        setQuizzes(res.quizzes);
-      }
-    } catch (e) {
-      console.error("[IntelligenceTools] Failed to load quizzes:", e);
-    } finally {
-      setIsLoadingQuizzes(false);
-    }
-  };
 
   const handleGenerateQuiz = async () => {
     if (selectedEditalItems.length === 0) {

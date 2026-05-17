@@ -70,18 +70,18 @@ export function FlashcardsTool({ benchId, subjects }: FlashcardsToolProps) {
     return () => clearInterval(interval);
   }, [isGeneratingFlashcards]);
 
-  useEffect(() => {
-    if (sidebarState === 'flashcard_list') {
-      loadStats();
-    }
-  }, [sidebarState, benchId]);
-
   const loadStats = async () => {
     const res = await getFlashcardStatsAction(benchId);
     if (res.success && res.total !== undefined && res.dueForReview !== undefined) {
       setStats({ total: res.total, dueForReview: res.dueForReview });
     }
   };
+
+  useEffect(() => {
+    if (sidebarState === 'flashcard_list') {
+      loadStats();
+    }
+  }, [sidebarState, benchId]);
 
   const startReview = async (subjectId?: string) => {
     setIsLoading(true);
