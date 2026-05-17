@@ -18,7 +18,6 @@ import {
 } from "@hugeicons/core-free-icons";
 import { getMaterialContent } from "@/lib/actions/fetch-bench";
 import Link from "next/link";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 
@@ -102,7 +101,7 @@ export function ViewMaterialDialog({
           </div>
         </DialogHeader>
         
-        <ScrollArea className="flex-1 p-6 bg-background">
+        <div className="flex-1 overflow-y-auto p-6 bg-background">
           {loading ? (
             <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-muted-foreground gap-3">
               <HugeiconsIcon icon={Loading03Icon} className="animate-spin text-primary" size={28} />
@@ -117,7 +116,7 @@ export function ViewMaterialDialog({
               Nenhum conteúdo disponível neste material.
             </div>
           )}
-        </ScrollArea>
+        </div>
 
         <div className="flex gap-2 p-4 border-t shrink-0 bg-secondary/5 items-center justify-end">
           <Button
