@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -16,10 +16,17 @@ import {
   Moon01Icon,
   Sun01Icon,
   ComputerIcon,
-  CreditCardIcon
+  CreditCardIcon,
+  SecurityIcon,
+  SmartPhone01Icon
 } from "@hugeicons/core-free-icons";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
+import {
+  getUserSessionsAction,
+  revokeSessionAction,
+  purgeUserDataAction
+} from "@/lib/actions/security";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +51,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { updateSettingsAction } from "@/lib/actions/settings";
 import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const settingsSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -64,6 +90,95 @@ interface SettingsFormProps {
 export function SettingsForm({ initialSettings, user }: SettingsFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { setTheme } = useTheme();
+
+  const [sessionsList, setSessionsList] = useState<any[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [confirmPurgeText, setConfirmPurgeText] = useState("");
+  const [isPurging, setIsPurging] = useState(false);
+
+  const fetchSessions = async () => {
+    setLoadingSessions(true);
+    try {
+      const res = await getUserSessionsAction(user.id);
+      if (res.success && res.data) {
+        setSessionsList(res.data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSessions();
+  }, []);
+
+  const handleRevokeSession = async (sessionId: string) => {
+    const previousSessions = [...sessionsList];
+    setSessionsList(sessionsList.filter(s => s.id !== sessionId));
+    toast.success("Desconectando dispositivo...");
+
+    try {
+      const res = await revokeSessionAction(sessionId, user.id);
+      if (res.success) {
+        toast.success(res.message || "Dispositivo desconectado!");
+      } else {
+        toast.error(res.error || "Erro ao desconectar.");
+        setSessionsList(previousSessions);
+      }
+    } catch (err) {
+      toast.error("Erro ao desconectar dispositivo.");
+      setSessionsList(previousSessions);
+    }
+  };
+
+  const handleExportData = () => {
+    const dataToExport = {
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      },
+      settings: initialSettings,
+      exportedAt: new Date().toISOString(),
+      disclaimer: "Dados exportados em conformidade com o Artigo 18 da LGPD (PLANY 2026)."
+    };
+
+    const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `plany-dados-exportados-${user.name.toLowerCase().replace(/\s+/g, "-")}.json`;
+    link.click();
+    toast.success("Seus dados foram empacotados e o download foi iniciado!");
+  };
+
+  const handlePurgeAccount = async () => {
+    if (confirmPurgeText !== "ELIMINAR MINHA CONTA") {
+      toast.error("Por favor, digite a frase de confirmação exatamente.");
+      return;
+    }
+
+    setIsPurging(true);
+    const toastId = toast.loading("Eliminando permanentemente todos os seus dados...");
+
+    try {
+      const res = await purgeUserDataAction(user.id);
+      if (res.success) {
+        toast.success("Dados permanentemente excluídos. Adeus!", { id: toastId });
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 2000);
+      } else {
+        toast.error(res.error || "Erro ao eliminar dados.", { id: toastId });
+        setIsPurging(false);
+      }
+    } catch (err) {
+      toast.error("Erro crítico ao eliminar dados.", { id: toastId });
+      setIsPurging(false);
+    }
+  };
 
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
@@ -132,6 +247,10 @@ export function SettingsForm({ initialSettings, user }: SettingsFormProps) {
               <TabsTrigger value="subscription" className="rounded-xl px-6 py-4 data-[state=active]:bg-background cursor-pointer data-[state=active]:shadow-sm transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
                 <HugeiconsIcon icon={CreditCardIcon} size={16} />
                 Assinatura
+              </TabsTrigger>
+              <TabsTrigger value="security" className="rounded-xl px-6 py-4 data-[state=active]:bg-background cursor-pointer data-[state=active]:shadow-sm transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+                <HugeiconsIcon icon={SecurityIcon} size={16} />
+                Segurança & Privacidade
               </TabsTrigger>
             </TabsList>
           </div>
@@ -404,6 +523,196 @@ export function SettingsForm({ initialSettings, user }: SettingsFormProps) {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Aba 5: Segurança & Privacidade */}
+          <TabsContent value="security" className="animate-in fade-in slide-in-from-bottom-2 duration-400">
+            <div className="space-y-8">
+              {/* Card Dispositivos */}
+              <Card className="border-border/50 py-0 bg-background/50 backdrop-blur-sm overflow-hidden rounded-[2rem] shadow-xl shadow-primary/5">
+                <CardHeader className="p-8 border-b border-border/50 bg-gradient-to-br from-primary/5 to-transparent">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                      <HugeiconsIcon icon={SecurityIcon} size={24} />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl font-black tracking-tight">Dispositivos Conectados</CardTitle>
+                      <CardDescription className="text-muted-foreground font-medium">Gerencie as sessões ativas e desconecte outros dispositivos de forma remota.</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-8">
+                  {loadingSessions ? (
+                    <div className="flex flex-col items-center justify-center py-10 gap-3 text-muted-foreground">
+                      <HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
+                      <p className="text-xs font-bold uppercase tracking-wider">Buscando conexões ativas...</p>
+                    </div>
+                  ) : sessionsList.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                      <p className="text-sm font-medium">Nenhuma sessão ativa encontrada.</p>
+                    </div>
+                  ) : (
+                    <div className="border border-border/40 rounded-2xl overflow-hidden bg-secondary/5">
+                      <Table>
+                        <TableHeader className="bg-secondary/10">
+                          <TableRow className="hover:bg-transparent border-b border-border/40">
+                            <TableHead className="w-12 text-center"></TableHead>
+                            <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Dispositivo / Navegador</TableHead>
+                            <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Endereço IP</TableHead>
+                            <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Última Atividade</TableHead>
+                            <TableHead className="w-24"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {sessionsList.map((s) => {
+                            const isMobileDevice = s.userAgent && /mobi|android|iphone|ipad/i.test(s.userAgent);
+                            return (
+                              <TableRow key={s.id} className="hover:bg-secondary/5 border-b border-border/20 transition-colors">
+                                <TableCell className="text-center py-4">
+                                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                                    <HugeiconsIcon
+                                      icon={isMobileDevice ? SmartPhone01Icon : ComputerIcon}
+                                      size={16}
+                                    />
+                                  </div>
+                                </TableCell>
+                                <TableCell className="font-semibold text-sm text-foreground py-4">
+                                  <div className="flex flex-col">
+                                    <span>{isMobileDevice ? "Dispositivo Móvel" : "Computador / Desktop"}</span>
+                                    <span className="text-[10px] text-muted-foreground font-medium font-mono line-clamp-1 max-w-[200px]" title={s.userAgent}>
+                                      {s.userAgent || "Navegador desconhecido"}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-xs font-mono text-muted-foreground py-4">
+                                  {s.ipAddress || "Local / Desconhecido"}
+                                </TableCell>
+                                <TableCell className="text-xs font-semibold text-muted-foreground py-4">
+                                  {new Date(s.lastActiveAt).toLocaleString("pt-BR", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit"
+                                  })}
+                                </TableCell>
+                                <TableCell className="text-right py-4 pr-6">
+                                  <Button
+                                    variant="ghost"
+                                    type="button"
+                                    onClick={() => handleRevokeSession(s.id)}
+                                    className="text-xs font-bold text-red-500 hover:text-red-600 hover:bg-red-500/10 rounded-xl transition-all cursor-pointer h-9 px-3"
+                                  >
+                                    Desconectar
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Card Danger Zone (LGPD) */}
+              <Card className="border-red-500/20 py-0 bg-red-500/5 backdrop-blur-sm overflow-hidden rounded-[2rem] shadow-xl shadow-red-500/5">
+                <CardHeader className="p-8 border-b border-red-500/10 bg-gradient-to-br from-red-500/5 to-transparent">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-red-500/10 rounded-2xl flex items-center justify-center text-red-500">
+                      <HugeiconsIcon icon={SecurityIcon} size={24} className="text-red-500" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl font-black tracking-tight text-red-500">Zona de Perigo (LGPD & Privacidade)</CardTitle>
+                      <CardDescription className="text-red-400/80 font-medium">Controle total dos seus dados. Ações irreversíveis que impactam a sua privacidade.</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-8 space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Seção exportar dados */}
+                    <div className="p-6 rounded-2xl bg-background/40 border border-border/40 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-bold text-foreground">Direito de Portabilidade (Art. 18 LGPD)</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Baixe uma cópia completa de todos os seus dados estruturados (cadernos, preferências e Persona) no formato padrão JSON de forma instantânea.
+                        </p>
+                      </div>
+                      <div className="mt-6">
+                        <Button
+                          variant="outline"
+                          type="button"
+                          onClick={handleExportData}
+                          className="w-full text-xs font-bold rounded-xl h-11 border border-border/40 hover:bg-secondary/10"
+                        >
+                          Exportar Meus Dados
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Seção deletar conta */}
+                    <div className="p-6 rounded-2xl bg-red-500/5 border border-red-500/10 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-bold text-red-500">Exclusão Permanente de Dados</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Apague definitivamente sua conta e toda sua base de dados (bancadas, materiais vetorizados, resumos e anotações). Esta ação é **irreversível**.
+                        </p>
+                      </div>
+                      <div className="mt-6">
+                        <AlertDialog>
+                          <AlertDialogTrigger
+                            render={
+                              <Button
+                                variant="destructive"
+                                type="button"
+                                className="w-full text-xs font-bold rounded-xl h-11 bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/15"
+                              >
+                                Eliminar Conta & Dados
+                              </Button>
+                            }
+                          />
+                          <AlertDialogContent className="rounded-3xl border-red-500/20 max-w-md bg-background p-6">
+                            <AlertDialogHeader className="space-y-3">
+                              <AlertDialogTitle className="text-xl font-black text-red-500 tracking-tight">Você tem certeza absoluta?</AlertDialogTitle>
+                              <AlertDialogDescription className="text-sm text-muted-foreground leading-relaxed">
+                                Esta ação é **irreversível** e de conformidade LGPD. Ao prosseguir, todos os seus dados de estudo, materiais, e anotações no PLANY serão eliminados de forma definitiva dos nossos servidores.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <div className="my-4 space-y-2">
+                              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                                Digite <span className="text-red-500 select-all">ELIMINAR MINHA CONTA</span> para confirmar:
+                              </label>
+                              <Input
+                                placeholder="ELIMINAR MINHA CONTA"
+                                value={confirmPurgeText}
+                                onChange={(e) => setConfirmPurgeText(e.target.value)}
+                                className="h-11 rounded-xl font-bold font-mono border-red-500/20 focus-visible:ring-red-500"
+                              />
+                            </div>
+                            <AlertDialogFooter className="gap-2">
+                              <AlertDialogCancel
+                                onClick={() => setConfirmPurgeText("")}
+                                className="rounded-xl h-11 text-xs font-bold border border-border/40 cursor-pointer"
+                              >
+                                Cancelar
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={handlePurgeAccount}
+                                disabled={confirmPurgeText !== "ELIMINAR MINHA CONTA" || isPurging}
+                                className="rounded-xl h-11 text-xs font-bold bg-red-600 hover:bg-red-700 text-white shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {isPurging ? "Eliminando..." : "Confirmar Exclusão"}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
 
