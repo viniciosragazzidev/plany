@@ -5,14 +5,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { 
-  UserAccountIcon, 
-  PaintBrush01Icon, 
-  Notification01Icon, 
-  Tick01Icon, 
+import {
+  UserAccountIcon,
+  PaintBrush01Icon,
+  Notification01Icon,
+  Tick01Icon,
   Loading03Icon,
   AiChat01Icon,
-  TextSizeIcon,
+  TextIcon,
   Moon01Icon,
   Sun01Icon,
   ComputerIcon
@@ -78,7 +78,7 @@ export function SettingsForm({ initialSettings, user }: SettingsFormProps) {
 
   async function onSubmit(data: SettingsFormValues) {
     setIsSubmitting(true);
-    
+
     // Optimistic feedback
     const toastId = toast.loading("Salvando configurações...");
 
@@ -115,16 +115,16 @@ export function SettingsForm({ initialSettings, user }: SettingsFormProps) {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <Tabs defaultValue="profile" className="w-full">
           <div className="flex justify-center mb-8">
-            <TabsList className="bg-secondary/20 p-1 rounded-2xl border border-border/50 h-auto">
-              <TabsTrigger value="profile" className="rounded-xl px-6 py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+            <TabsList className="bg-secondary/5 p-1 py-5 rounded-2xl border border-border/50 h-auto">
+              <TabsTrigger value="profile" className="rounded-xl px-6 py-4 data-[state=active]:bg-background cursor-pointer data-[state=active]:shadow-sm transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
                 <HugeiconsIcon icon={UserAccountIcon} size={16} />
                 Perfil & Persona
               </TabsTrigger>
-              <TabsTrigger value="appearance" className="rounded-xl px-6 py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+              <TabsTrigger value="appearance" className="rounded-xl px-6 py-4 data-[state=active]:bg-background cursor-pointer data-[state=active]:shadow-sm transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
                 <HugeiconsIcon icon={PaintBrush01Icon} size={16} />
                 Aparência
               </TabsTrigger>
-              <TabsTrigger value="notifications" className="rounded-xl px-6 py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+              <TabsTrigger value="notifications" className="rounded-xl px-6 py-4 data-[state=active]:bg-background cursor-pointer data-[state=active]:shadow-sm transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
                 <HugeiconsIcon icon={Notification01Icon} size={16} />
                 Notificações
               </TabsTrigger>
@@ -133,7 +133,7 @@ export function SettingsForm({ initialSettings, user }: SettingsFormProps) {
 
           {/* Aba 1: Perfil & Persona */}
           <TabsContent value="profile" className="animate-in fade-in slide-in-from-bottom-2 duration-400">
-            <Card className="border-border/50 bg-background/50 backdrop-blur-sm overflow-hidden rounded-[2rem] shadow-xl shadow-primary/5">
+            <Card className="  py-0 bg-background/50 border-0 backdrop-blur-sm overflow-hidden rounded-[2rem] shadow-xl shadow-primary/5">
               <CardHeader className="p-8 border-b border-border/50 bg-gradient-to-br from-primary/5 to-transparent">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
@@ -175,7 +175,7 @@ export function SettingsForm({ initialSettings, user }: SettingsFormProps) {
                             <SelectValue placeholder="Selecione sua persona" />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent className="rounded-xl border-border/50">
+                        <SelectContent className="rounded-xl border-border/50 min-w-fit w-fit">
                           <SelectItem value="concurseiro" className="font-bold">Concurseiro (Foco em Editais e Leis)</SelectItem>
                           <SelectItem value="universitario" className="font-bold">Universitário (Foco em Teoria e Acadêmico)</SelectItem>
                           <SelectItem value="vestibulando" className="font-bold">Vestibulando (Foco em Base e Enem)</SelectItem>
@@ -195,7 +195,7 @@ export function SettingsForm({ initialSettings, user }: SettingsFormProps) {
 
           {/* Aba 2: Aparência */}
           <TabsContent value="appearance" className="animate-in fade-in slide-in-from-bottom-2 duration-400">
-            <Card className="border-border/50 bg-background/50 backdrop-blur-sm overflow-hidden rounded-[2rem] shadow-xl shadow-primary/5">
+            <Card className="border-border/50 bg-background/50  py-0 backdrop-blur-sm overflow-hidden rounded-[2rem] shadow-xl shadow-primary/5">
               <CardHeader className="p-8 border-b border-border/50 bg-gradient-to-br from-primary/5 to-transparent">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
@@ -225,18 +225,18 @@ export function SettingsForm({ initialSettings, user }: SettingsFormProps) {
                             onClick={() => field.onChange(item.value)}
                             className={cn(
                               "cursor-pointer flex flex-col items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all group",
-                              field.value === item.value 
-                                ? "border-primary bg-primary/5 shadow-inner" 
+                              field.value === item.value
+                                ? "border-primary bg-primary/5 shadow-inner"
                                 : "border-border/50 bg-secondary/5 hover:border-border hover:bg-secondary/10"
                             )}
                           >
-                            <HugeiconsIcon 
-                              icon={item.icon} 
-                              size={24} 
+                            <HugeiconsIcon
+                              icon={item.icon}
+                              size={24}
                               className={cn(
                                 "transition-transform group-hover:scale-110",
                                 field.value === item.value ? "text-primary" : "text-muted-foreground"
-                              )} 
+                              )}
                             />
                             <span className={cn(
                               "text-[10px] font-black uppercase tracking-widest",
@@ -258,7 +258,7 @@ export function SettingsForm({ initialSettings, user }: SettingsFormProps) {
                   render={({ field }) => (
                     <FormItem className="space-y-4">
                       <div className="flex items-center gap-2">
-                        <HugeiconsIcon icon={TextSizeIcon} size={16} className="text-primary" />
+                        <HugeiconsIcon icon={TextIcon} size={16} className="text-primary" />
                         <FormLabel className="text-xs font-black uppercase tracking-widest text-muted-foreground">Tamanho da Fonte (Editor & Chat)</FormLabel>
                       </div>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
@@ -284,7 +284,7 @@ export function SettingsForm({ initialSettings, user }: SettingsFormProps) {
 
           {/* Aba 3: Notificações */}
           <TabsContent value="notifications" className="animate-in fade-in slide-in-from-bottom-2 duration-400">
-            <Card className="border-border/50 bg-background/50 backdrop-blur-sm overflow-hidden rounded-[2rem] shadow-xl shadow-primary/5">
+            <Card className="border-border/50  py-0 bg-background/50 backdrop-blur-sm overflow-hidden rounded-[2rem] shadow-xl shadow-primary/5">
               <CardHeader className="p-8 border-b border-border/50 bg-gradient-to-br from-primary/5 to-transparent">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
@@ -346,8 +346,8 @@ export function SettingsForm({ initialSettings, user }: SettingsFormProps) {
         </Tabs>
 
         <div className="flex justify-end pt-4">
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             disabled={isSubmitting}
             className="h-14 px-10 rounded-2xl gap-3 font-black uppercase text-xs tracking-[0.2em] shadow-xl transition-all hover:-translate-y-1 bg-primary text-white shadow-primary/20"
           >

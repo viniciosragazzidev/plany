@@ -29,8 +29,8 @@ export default async function SettingsPage() {
                 Preferências
               </Badge>
             </div>
-            <h2 className="text-3xl font-black tracking-tight text-foreground flex items-center gap-3">
-              <HugeiconsIcon icon={Settings01Icon} size={28} className="text-primary" />
+            <h2 className="text-xl font-black tracking-tight text-foreground flex items-center gap-3">
+              <HugeiconsIcon icon={Settings01Icon} size={20} className="text-primary" />
               Configurações
             </h2>
             <p className="text-muted-foreground text-sm font-medium">

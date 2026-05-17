@@ -74,19 +74,24 @@ export default function SidebarDashboard() {
                     <span className="text-sm font-medium">{session?.user?.name}</span>
                     <span className="text-xs text-muted-foreground">{session?.user?.email}</span>
                 </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="gap-2" asChild>
-                    <Link href="/dashboard/settings?tab=profile">
-                        <HugeiconsIcon icon={UserCircleIcon} size={16} />
-                        Perfil
-                    </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="gap-2" asChild>
-                    <Link href="/dashboard/settings">
-                        <HugeiconsIcon icon={Settings02Icon} size={16} />
-                        Configurações
-                    </Link>
-                </DropdownMenuItem>
+                <DropdownMenuItem
+                    className="gap-2"
+                    render={
+                        <Link href="/dashboard/settings?tab=profile">
+                            <HugeiconsIcon icon={UserCircleIcon} size={16} />
+                            Perfil
+                        </Link>
+                    }
+                />
+                <DropdownMenuItem
+                    className="gap-2"
+                    render={
+                        <Link href="/dashboard/settings">
+                            <HugeiconsIcon icon={Settings02Icon} size={16} />
+                            Configurações
+                        </Link>
+                    }
+                />
                 <DropdownMenuSeparator />
                 <div className="flex items-center justify-between px-2 py-1.5 focus:bg-accent focus:text-accent-foreground outline-none transition-colors">
                     <div className="flex items-center gap-2">
